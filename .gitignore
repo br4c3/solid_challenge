@@ -151,6 +151,13 @@ activemq-data/
 .env
 .envrc
 .venv
+.uv-cache/
+
+# Generated pipeline outputs.
+data/components.csv
+data/mcs.csv
+data/pdfs/
+data/uploaded_components.csv
 env/
 venv/
 ENV/
