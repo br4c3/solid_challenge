@@ -1,7 +1,20 @@
 from rf_design.datasheet_parser import ExtractedField
 from rf_design.csv_repository import ComponentRepository
 from rf_design.models import Component
-from scripts.pipeline import RESEARCHED_PRODUCT_ROWS, anokiwave_rows_from_html, append_discovered_rows, apply_extracted_fields, discovered_row, find_datasheet_url, find_product_image_url, import_reference_components, read_rows, resolve_datasheet_url, save_components
+from scripts.pipeline import (
+    RESEARCHED_PRODUCT_ROWS,
+    anokiwave_rows_from_html,
+    append_discovered_rows,
+    apply_extracted_fields,
+    discovered_row,
+    find_datasheet_url,
+    find_product_image_url,
+    import_reference_components,
+    process_rows,
+    read_rows,
+    resolve_datasheet_url,
+    save_components,
+)
 
 
 def test_find_datasheet_url_uses_official_pdf():
@@ -143,3 +156,37 @@ def test_failed_refresh_preserves_previous_extraction(tmp_path):
     saved = repo.list()[0]
     assert saved.extraction_method == "PDF_TEXT"
     assert saved.specs["pa_gain_db"] == 22.0
+
+
+def test_parallel_processing_preserves_seed_order(monkeypatch):
+    sessions = []
+
+    class Session:
+        def close(self): pass
+
+    def make_test_session():
+        session = Session()
+        sessions.append(session)
+        return session
+
+    def process_test_row(session, row, offline):
+        assert session in sessions
+        assert offline is True
+        return Component(None, row["category"], row["manufacturer"], row["part_no"])
+
+    monkeypatch.setattr("scripts.pipeline.make_session", make_test_session)
+    monkeypatch.setattr("scripts.pipeline.process_row", process_test_row)
+    rows = [
+        {"category": "PA","manufacturer": "A","part_no": "FIRST"},
+        {"category": "LNA","manufacturer": "B","part_no": "SECOND"},
+        {"category": "PLL","manufacturer": "C","part_no": "THIRD"},
+    ]
+
+    components = process_rows(rows, offline=True, workers=3)
+
+    assert [component.part_no for component in components] == ["FIRST","SECOND","THIRD"]
+    assert len(sessions) == 3
+
+
+def test_parallel_processing_accepts_empty_rows():
+    assert process_rows([], offline=True, workers=4) == []

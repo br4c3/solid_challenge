@@ -9,6 +9,8 @@ import os
 import re
 import sys
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,8 +29,9 @@ from rf_design.datasheet_parser import extract_fields_from_pages, extract_pdf_pa
 from rf_design.importer import component_from_csv_row, import_components, import_mcs
 
 
-SEED_CSV = ROOT / "data/catalog/manufacturer_product_seeds.csv"
-PDF_DIR  = ROOT / "data/pdfs"
+SEED_CSV            = ROOT / "data/catalog/manufacturer_product_seeds.csv"
+PDF_DIR             = ROOT / "data/pdfs"
+QORVO_DOWNLOAD_LOCK = threading.Lock()
 
 MANUFACTURER_DOMAINS = {
     "Qorvo": ("qorvo.com",),
@@ -407,7 +410,8 @@ def process_row(session: requests.Session, row: dict, offline: bool = False):
         elif offline:
             raise RuntimeError("캐시된 Datasheet PDF가 없음")
         elif manufacturer == "Qorvo":
-            datasheet_url = download_qorvo_pdf(product_url, pdf_path)
+            with QORVO_DOWNLOAD_LOCK:
+                datasheet_url = download_qorvo_pdf(product_url, pdf_path)
         elif product_url and not datasheet_url and product is None:
             product        = get(session, manufacturer, product_url)
             datasheet_url  = find_datasheet_url(manufacturer, product.url, product.content)
@@ -459,6 +463,29 @@ def make_session() -> requests.Session:
     return session
 
 
+def process_rows(rows: list[dict], offline: bool, workers: int) -> list:
+    if not rows: return []
+    workers    = max(1, min(workers, len(rows)))
+    components = [None] * len(rows)
+
+    def task(row: dict):
+        session = make_session()
+        try:
+            return process_row(session, row, offline)
+        finally:
+            session.close()
+
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="rf-pipeline") as executor:
+        futures = {executor.submit(task, row): index for index,row in enumerate(rows)}
+        for future in as_completed(futures):
+            index             = futures[future]
+            component         = future.result()
+            components[index] = component
+            print(f"[{index+1}/{len(rows)}] {component.manufacturer} {component.part_no}: {component.extraction_method or component.note}")
+
+    return components
+
+
 def save_components(repository: ComponentRepository, components: list, replace: bool) -> None:
     previous = {(item.category,item.manufacturer,item.part_no): item for item in repository.list()}
     saved    = []
@@ -478,7 +505,7 @@ def import_reference_components(repository: ComponentRepository) -> tuple[int,li
     return import_components(component_book, repository)
 
 
-def run(offline: bool = False, limit: int = 0, part_no: str = "", discover: bool = True) -> ComponentRepository:
+def run(offline: bool=False, limit: int=0, part_no: str="", discover: bool=True, workers: int=4) -> ComponentRepository:
     if discover and not offline and not limit and not part_no:
         session    = make_session()
         discovered = list(RESEARCHED_PRODUCT_ROWS)+discover_qorvo_products()
@@ -494,13 +521,7 @@ def run(offline: bool = False, limit: int = 0, part_no: str = "", discover: bool
     if part_no: rows = [row for row in rows if row.get("part_no", "").lower() == part_no.lower()]
     if limit: rows = rows[:limit]
     if not rows: raise SystemExit(f"seed CSV에서 부품을 찾지 못함: {part_no}")
-    session = make_session()
-
-    components = []
-    for index,row in enumerate(rows, start=1):
-        component = process_row(session, row, offline)
-        components.append(component)
-        print(f"[{index}/{len(rows)}] {component.manufacturer} {component.part_no}: {component.extraction_method or component.note}")
+    components = process_rows(rows, offline, workers)
 
     repository   = ComponentRepository()
     full_refresh = not limit and not part_no
@@ -520,13 +541,14 @@ def main() -> int:
     parser.add_argument("--offline", action="store_true", help="네트워크 대신 data/pdfs의 기존 PDF 사용")
     parser.add_argument("--limit", type=int, default=0, help="처리할 부품 수, 0이면 전체")
     parser.add_argument("--part-no", default="", help="지정한 Part No. 하나만 처리")
+    parser.add_argument("--workers", type=int, default=4, help="PDF 다운로드·추출 병렬 worker 수")
     parser.add_argument("--skip-discovery", action="store_true", help="공식 카탈로그 신규 부품 탐색 생략")
     parser.add_argument("--serve", action="store_true", help="완료 후 Streamlit 앱 실행")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8501)
     args = parser.parse_args()
 
-    run(args.offline, args.limit, args.part_no, not args.skip_discovery)
+    run(args.offline, args.limit, args.part_no, not args.skip_discovery, args.workers)
     if not args.serve: return 0
     command = [
         sys.executable,"-m","streamlit","run",str(ROOT / "app.py"),

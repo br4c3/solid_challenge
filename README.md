@@ -55,6 +55,14 @@ CSV 생성까지만 실행하려면 다음 명령을 사용합니다.
 .venv/bin/python scripts/pipeline.py
 ```
 
+PDF 탐색·다운로드·텍스트/OCR 추출은 기본적으로 4개 작업을 동시에 처리합니다. 동시 작업 수는 조절할 수 있습니다.
+
+```bash
+.venv/bin/python scripts/pipeline.py --workers 6
+```
+
+Qorvo의 브라우저 다운로드는 429 차단을 줄이기 위해 한 번에 하나만 실행하고, 이미 받은 Qorvo PDF와 다른 제조사 자료는 병렬로 분석합니다. 메모리 사용량이 크거나 사이트 제한이 심하면 `--workers 1`로 실행합니다.
+
 테스트 목적으로 처음 몇 개만 처리할 수 있습니다.
 
 ```bash
