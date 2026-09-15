@@ -26,6 +26,15 @@ def required_function(requirement: LinkRequirement) -> str:
     return requirement.direction
 
 
+def esa_band(application: str, direction: str):
+    requirement = LinkRequirement(application, direction, 1.0, 1.0, 0.0, 1.0, 90.0)
+    function    = required_function(requirement)
+    if application.strip().lower() == "terminal": return (27.5,31.0) if function == "Tx" else (17.7,21.2)
+    if application.strip().lower() == "payload": return (17.7,21.2) if function == "Tx" else (27.5,31.0)
+
+    return None
+
+
 def _frequency_range(component: Component):
     if component.category.upper() == "MIXER":
         return component.value("rf_min_ghz"),component.value("rf_max_ghz")

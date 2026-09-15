@@ -8,7 +8,7 @@ from openpyxl import load_workbook
 
 from .csv_repository import ComponentRepository
 from .models import Component, MCS
-from .parsing import first_number, normalize_application, parse_power_w, parse_range
+from .parsing import first_number, infer_grade, normalize_application, parse_power_w, parse_range
 
 
 SHEET_CATEGORIES = {
@@ -108,6 +108,7 @@ def import_components(path: Path, repository: ComponentRepository) -> Tuple[int,
             if not part_no or not manufacturer:
                 continue
             application = normalize_application(raw("Application (Terminal / Payload)"))
+            if str(part_no).strip().upper() == "ADAR3002": application = "Terminal"
             function_label = next((key for key in rows if key.startswith("Function (")), "")
             function = str(raw(function_label) or "")
             freq_label = "Operating Frequency Range" if "Operating Frequency Range" in rows else "RF Frequency Range"
@@ -158,6 +159,7 @@ def import_components(path: Path, repository: ComponentRepository) -> Tuple[int,
                 operating_temp_max_c=common_values.get("operating_temp_max_c"),
                 product_url=REFERENCE_PRODUCT_URLS.get(str(part_no).strip()),
                 image_url=REFERENCE_PRODUCT_IMAGES.get(str(part_no).strip()),
+                grade=infer_grade(part_no, raw("Notes / Remarks"), raw("Comments")),
                 source_file=Path(path).name,
                 note=f"Excel slot: {ws.cell(4, column).value}",
                 specs={key: value for key, value in specs.items() if value is not None},
@@ -192,7 +194,7 @@ COMMON_CSV_FIELDS = {
     "package","operating_temp_min_c","operating_temp_max_c","product_url",
     "datasheet_url","datasheet_revision","datasheet_page","data_origin","retrieved_at",
     "review_status","slot","note",
-    "source_file","source_date","extraction_method","extraction_evidence","image_url",
+    "source_file","source_date","extraction_method","extraction_evidence","image_url","grade",
 }
 
 
@@ -237,6 +239,7 @@ def component_from_csv_row(row: dict, source_file: str = "csv") -> Component:
         extraction_evidence=row.get("extraction_evidence") or None,
         note=row.get("note") or None,
         image_url=row.get("image_url") or None,
+        grade=row.get("grade") or infer_grade(row.get("part_no"), row.get("note"), row.get("function")),
         specs=specs,
     )
 

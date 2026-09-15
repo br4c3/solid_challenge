@@ -47,6 +47,7 @@ class Component:
     extraction_evidence  : Optional[str]   = None
     note                 : Optional[str]   = None
     image_url            : Optional[str]   = None
+    grade                : str             = "Commercial-grade"
     specs                : Dict[str, Any]  = field(default_factory=dict)
 
     def value(self, *keys: str, default: Any = None) -> Any:

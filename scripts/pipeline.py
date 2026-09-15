@@ -66,6 +66,38 @@ ANOKIWAVE_CATALOG = "https://www.anokiwave.com/products/aero_index_all.html"
 
 RESEARCHED_PRODUCT_ROWS = (
     {
+        "category": "BFIC","slot": "researched_official","manufacturer": "Analog Devices","part_no": "ADAR3000S",
+        "application": "Payload","function": "Tx","freq_min_ghz": 17.0,"freq_max_ghz": 22.0,"number_channels": 16,
+        "number_beams": 4,"channel_bandwidth_ghz": 5.0,"power_consumption_w": 0.192,"package": "311-ball CSPBGA",
+        "product_url": "https://www.analog.com/en/products/adar3000s.html","grade": "Space-grade",
+        "data_origin": "official_product_research","review_status": "MANUFACTURER_SOURCE_REVIEWED",
+        "note": "Payload Tx용 commercial-space BFIC; 상세 RF 성능은 NDA 필요",
+    },
+    {
+        "category": "BFIC","slot": "researched_official","manufacturer": "Analog Devices","part_no": "ADAR3001S",
+        "application": "Payload","function": "Rx","freq_min_ghz": 27.5,"freq_max_ghz": 31.0,"number_channels": 16,
+        "number_beams": 4,"channel_bandwidth_ghz": 3.5,"power_consumption_w": 0.192,"package": "311-ball CSPBGA",
+        "product_url": "https://www.analog.com/en/products/adar3001s.html","grade": "Space-grade",
+        "data_origin": "official_product_research","review_status": "MANUFACTURER_SOURCE_REVIEWED",
+        "note": "Payload Rx용 commercial-space BFIC; 상세 RF 성능은 NDA 필요",
+    },
+    {
+        "category": "BFIC","slot": "researched_official","manufacturer": "Analog Devices","part_no": "ADAR3000",
+        "application": "Payload","function": "Tx","freq_min_ghz": 17.0,"freq_max_ghz": 22.0,"number_channels": 16,
+        "number_beams": 4,"channel_bandwidth_ghz": 5.0,"power_consumption_w": 0.192,"package": "311-ball CSPBGA",
+        "product_url": "https://www.analog.com/en/products/adar3000.html","grade": "Commercial-grade",
+        "data_origin": "official_product_research","review_status": "MANUFACTURER_SOURCE_REVIEWED",
+        "note": "Payload Tx용 commercial BFIC; 상세 RF 성능은 NDA 필요",
+    },
+    {
+        "category": "BFIC","slot": "researched_official","manufacturer": "Analog Devices","part_no": "ADAR3001",
+        "application": "Payload","function": "Rx","freq_min_ghz": 27.5,"freq_max_ghz": 31.0,"number_channels": 16,
+        "number_beams": 4,"channel_bandwidth_ghz": 3.5,"power_consumption_w": 0.192,"package": "311-ball CSPBGA",
+        "product_url": "https://www.analog.com/en/products/adar3001.html","grade": "Commercial-grade",
+        "data_origin": "official_product_research","review_status": "MANUFACTURER_SOURCE_REVIEWED",
+        "note": "Payload Rx용 commercial BFIC; 상세 RF 성능은 NDA 필요",
+    },
+    {
         "category": "PA","slot": "researched_official","manufacturer": "Qorvo","part_no": "QPA2211",
         "application": "Common","function": "PA","process": "GaN","freq_min_ghz": 27.5,"freq_max_ghz": 31.0,
         "product_url": "https://www.qorvo.com/products/p/QPA2211","data_origin": "official_product_research","review_status": "REVIEW_REQUIRED",
@@ -456,7 +488,9 @@ def run(offline: bool = False, limit: int = 0, part_no: str = "", discover: bool
             print(f"자동발견 경고: {ANOKIWAVE_CATALOG}: {type(exc).__name__}: {exc}")
         added = append_discovered_rows(SEED_CSV, discovered)
         print(f"공식 카탈로그 자동발견: 후보 {len(discovered)}개, 신규 {len(added)}개"+(f" ({', '.join(row['part_no'] for row in added)})" if added else ""))
-    rows = read_rows(SEED_CSV)
+    rows     = read_rows(SEED_CSV)
+    existing = {row.get("part_no", "").lower() for row in rows}
+    rows    += [dict(row) for row in RESEARCHED_PRODUCT_ROWS if row["part_no"].lower() not in existing]
     if part_no: rows = [row for row in rows if row.get("part_no", "").lower() == part_no.lower()]
     if limit: rows = rows[:limit]
     if not rows: raise SystemExit(f"seed CSV에서 부품을 찾지 못함: {part_no}")

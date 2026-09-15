@@ -27,6 +27,8 @@ app.py
 
 기본 부품에 더해, 전체 온라인 실행마다 공식 Qorvo 카탈로그와 Anokiwave SATCOM 전체 목록에서 목표 K/Ka 중심주파수를 지원하는 신규 제품을 찾습니다. 공식 자료로 확인된 Qorvo PA/Mixer, Analog Devices LNA/Mixer/PLL, TI PLL 후보 풀도 함께 seed에 추가합니다. 여기에 기준 엑셀의 BFIC를 병합해 하나의 `components.csv`로 만들며, 앱의 Tx/Rx chain 생성기가 별도 변환 없이 이 CSV를 바로 사용합니다.
 
+ESA 대역은 Terminal Tx/Payload Rx `27.5~31 GHz`, Terminal Rx/Payload Tx `17.7~21.2 GHz`로 적용합니다. Payload 후보는 Space-grade를 우선 정렬하되 Commercial-grade도 비교 대상에 포함하며, 모든 부품은 `grade` 열에 등급을 명시합니다. 기준 엑셀에서 Payload로 기재된 ADAR3002는 병합할 때 Terminal Rx 부품으로 교정합니다.
+
 ## 설치
 
 macOS에서는 OCR 엔진을 먼저 설치합니다.

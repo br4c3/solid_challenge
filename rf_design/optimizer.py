@@ -35,6 +35,10 @@ def _total_power(components: Sequence[Component]):
     return sum(value for value in values if value is not None) if any(value is not None for value in values) else None
 
 
+def _commercial_count(components: Sequence[Component]) -> int:
+    return sum(component.grade != "Space-grade" for component in components)
+
+
 def generate_tx_candidates(requirement: LinkRequirement, components: Iterable[Component], mcs_table: Iterable[MCS], limit: int = 5000) -> Tuple[List[DesignCandidate], List[str]]:
     accepted,_ = filter_components(components, requirement)
     groups     = _by_category(accepted)
@@ -64,6 +68,7 @@ def generate_tx_candidates(requirement: LinkRequirement, components: Iterable[Co
         candidates.append(DesignCandidate(chain+[pll], pair_checks, power, eirp, link, _total_power(chain+[pll])))
     candidates.sort(key=lambda item: (
         item.status != Status.PASS,
+        _commercial_count(item.components) if requirement.application.lower() == "payload" else 0,
         -(item.link_budget.link_margin_db if item.link_budget and item.link_budget.link_margin_db is not None else -9999),
         -(item.link_budget.throughput_margin_mbps if item.link_budget else -9999),
         item.total_power_w if item.total_power_w is not None else 9999,
@@ -94,6 +99,11 @@ def generate_rx_candidates(requirement: LinkRequirement, components: Iterable[Co
             continue
         chain = rf_chain+[component for component in (converter,pll) if component is not None]
         results.append({"components": chain, "checks": [lo_check], "total_gain_db": gain, "total_nf_db": nf, "total_power_w": _total_power(chain)})
-    results.sort(key=lambda item: (item["total_nf_db"], -item["total_gain_db"], item["total_power_w"] or 9999))
+    results.sort(key=lambda item: (
+        _commercial_count(item["components"]) if requirement.application.lower() == "payload" else 0,
+        item["total_nf_db"],
+        -item["total_gain_db"],
+        item["total_power_w"] or 9999,
+    ))
     if not results: return [],["부품 간 LO 조건과 수신 이득/NF 조건을 만족하는 Rx 조합이 없습니다."]
     return results,[]

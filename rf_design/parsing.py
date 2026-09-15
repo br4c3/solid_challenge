@@ -56,3 +56,13 @@ def normalize_application(value: Any) -> str:
     if "terminal" in text and "payload" not in text: return "Terminal"
     if "payload" in text and "terminal" not in text: return "Payload"
     return "Common"
+
+
+def infer_grade(part_no: Any, *descriptions: Any) -> str:
+    part = str(part_no or "").upper()
+    text = " ".join(str(value or "") for value in descriptions).lower()
+    space_parts = {"ADAR3000S","ADAR3001S"}
+    if part.endswith("-SP") or part in space_parts or any(label in text for label in ("space-grade","space grade","space qualified","radiation hardened","rad-hard")):
+        return "Space-grade"
+
+    return "Commercial-grade"

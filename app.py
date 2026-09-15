@@ -9,7 +9,7 @@ import streamlit as st
 
 from rf_design.csv_repository import ComponentRepository
 from rf_design.datasheet_parser import parse_datasheet_pdf
-from rf_design.engine.compatibility import check_component, overall_status, required_function
+from rf_design.engine.compatibility import check_component, esa_band, overall_status, required_function
 from rf_design.engine.link_budget import calculate_eirp, calculate_link_budget
 from rf_design.importer import import_components_csv, import_mcs
 from rf_design.models import Component, LinkRequirement, Status
@@ -31,7 +31,7 @@ def repository() -> ComponentRepository:
 
 
 def default_requirement() -> LinkRequirement:
-    return LinkRequirement("Terminal", "Uplink", 30.0, 20.0, 40.0, 888.0, 30.0)
+    return LinkRequirement("Terminal", "Uplink", 29.25, 20.0, 40.0, 888.0, 30.0)
 
 
 def component_rows(items):
@@ -39,7 +39,7 @@ def component_rows(items):
     for item in items:
         row = {
             "ID": item.component_id, "Block": item.category, "Manufacturer": item.manufacturer,
-            "Part No.": item.part_no, "Application": item.application, "Function": item.function,
+            "Part No.": item.part_no, "Application": item.application, "Function": item.function, "Grade": item.grade,
             "Freq Min (GHz)": item.freq_min_ghz, "Freq Max (GHz)": item.freq_max_ghz,
             "Power (W)": item.power_consumption_w, "Extraction": item.extraction_method,
             "Datasheet": item.datasheet_url, "Note": item.note,
@@ -63,7 +63,7 @@ def show_purchase_list(candidate):
                     st.caption("공식 상품 이미지 없음")
             with detail_column:
                 st.markdown(f"#### {index}. {item.part_no}")
-                st.write(f"**제조사:** {item.manufacturer}  \n**역할:** {item.category} · {item.function or '-'}  \n**평가용 수량:** 1개  \n**패키지:** {item.package or '확인 필요'}")
+                st.write(f"**제조사:** {item.manufacturer}  \n**역할:** {item.category} · {item.function or '-'}  \n**등급:** {item.grade}  \n**평가용 수량:** 1개  \n**패키지:** {item.package or '확인 필요'}")
                 if item.freq_min_ghz is not None and item.freq_max_ghz is not None:
                     st.write(f"**주파수:** {item.freq_min_ghz:g}~{item.freq_max_ghz:g} GHz")
                 links = st.columns(2)
@@ -140,6 +140,7 @@ def page_components(repo: ComponentRepository):
     with st.form("component_form"):
         categories    = ["BFIC","PA","LNA","SWITCH","MIXER","PLL","ADC","DAC"]
         applications  = ["Common","Terminal","Payload"]
+        grades        = ["Commercial-grade","Space-grade"]
         c1,c2,c3       = st.columns(3)
         category       = c1.selectbox("Category", categories, index=categories.index(current.category) if current and current.category in categories else 0)
         manufacturer   = c2.text_input("Manufacturer", current.manufacturer if current else "")
@@ -147,6 +148,7 @@ def page_components(repo: ComponentRepository):
         application    = c1.selectbox("Application", applications, index=applications.index(current.application) if current and current.application in applications else 0)
         function       = c2.text_input("Function", current.function if current else "")
         datasheet      = c3.text_input("Datasheet URL", current.datasheet_url or "" if current else "")
+        grade          = c1.selectbox("Grade", grades, index=grades.index(current.grade) if current and current.grade in grades else 0)
         freq_min       = c1.number_input("Freq Min (GHz)", value=float(current.freq_min_ghz or 0) if current else 0.0)
         freq_max       = c2.number_input("Freq Max (GHz)", value=float(current.freq_max_ghz or 0) if current else 0.0)
         power_w        = c3.number_input("DC Power (W)", min_value=0.0, value=float(current.power_consumption_w or 0) if current else 0.0)
@@ -185,6 +187,7 @@ def page_components(repo: ComponentRepository):
                         freq_max_ghz=freq_max or None,
                         power_consumption_w=power_w or None,
                         datasheet_url=datasheet or None,
+                        grade=grade,
                         specs=specs,
                     )
                     repo.upsert(component)
@@ -207,6 +210,7 @@ def requirement_form():
         application = c1.selectbox("Application", ["Terminal","Payload"], index=0 if req.application == "Terminal" else 1)
         direction   = c2.selectbox("Direction", directions, index=directions.index(req.direction))
         center      = c3.number_input("Center Frequency (GHz)", min_value=0.001, value=req.center_freq_ghz)
+        auto_band   = c3.checkbox("ESA 표준 대역 자동 적용", value=True)
         bw          = c1.number_input("Channel BW (MHz)", min_value=0.001, value=req.channel_bw_mhz)
         target      = c2.number_input("Target Throughput (Mbps)", min_value=0.0, value=req.target_throughput_mbps)
         beams       = c3.number_input("Number of Beams", min_value=1, value=req.num_beams, step=1)
@@ -227,6 +231,8 @@ def requirement_form():
         tx_input    = c3.number_input("Tx Chain Input (dBm)", value=req.tx_input_power_dbm)
         saved       = st.form_submit_button("요구조건 저장", type="primary")
     if saved:
+        selected_band = esa_band(application, direction)
+        if auto_band and selected_band: center = sum(selected_band) / 2
         st.session_state.requirement = LinkRequirement(
             application,
             direction,
@@ -253,7 +259,8 @@ def requirement_form():
             backoff,
             req.nonlinear_snr_db,
         )
-        st.success(f"필요 대역 {st.session_state.requirement.required_low_ghz:.4f}~{st.session_state.requirement.required_high_ghz:.4f} GHz로 저장했습니다.")
+        band_text = f" · ESA 기준 {selected_band[0]:g}~{selected_band[1]:g} GHz" if selected_band else ""
+        st.success(f"필요 대역 {st.session_state.requirement.required_low_ghz:.4f}~{st.session_state.requirement.required_high_ghz:.4f} GHz로 저장했습니다.{band_text}")
 
 
 def page_compatible(repo: ComponentRepository):
@@ -267,6 +274,7 @@ def page_compatible(repo: ComponentRepository):
             "ID": item.component_id,
             "Stage": item.category,
             "Part No.": item.part_no,
+            "Grade": item.grade,
             "Application": checks[0].status.value,
             "Frequency": next((x.status.value for x in checks if x.rule == "frequency"), "-"),
             "Overall": status.value,
@@ -311,6 +319,7 @@ def page_design(repo: ComponentRepository):
                     "Rank": index+1,
                     "Chain": " → ".join(x.part_no for x in item.components),
                     "Status": item.status.value,
+                    "Grade": " / ".join(sorted({x.grade for x in item.components})),
                     "Link Margin (dB)": item.link_budget.link_margin_db,
                     "Throughput (Mbps)": item.link_budget.throughput_mbps,
                     "DC Power (W)": item.total_power_w,

@@ -50,8 +50,8 @@ def test_researched_official_pool_covers_multiple_categories():
     categories = {row["category"] for row in RESEARCHED_PRODUCT_ROWS}
     parts      = {row["part_no"] for row in RESEARCHED_PRODUCT_ROWS}
 
-    assert categories == {"PA","LNA","MIXER","PLL"}
-    assert {"QPA2211","QPC4610","HMC519-DIE","HMC8192","ADF4371","LMX2595"} <= parts
+    assert categories == {"BFIC","PA","LNA","MIXER","PLL"}
+    assert {"ADAR3000S","ADAR3001","QPA2211","QPC4610","HMC519-DIE","HMC8192","ADF4371","LMX2595"} <= parts
 
 
 def test_qorvo_catalog_card_discovers_ka_band_component():
@@ -117,6 +117,10 @@ def test_reference_bfics_are_added_to_final_component_csv(tmp_path):
     assert warnings == []
     assert len(repo.list("BFIC")) == 10
     assert len(repo.list()) == 11
+    adar3002 = next(component for component in repo.list() if component.part_no == "ADAR3002")
+    assert adar3002.application == "Terminal"
+    assert adar3002.function == "Rx"
+    assert adar3002.grade == "Commercial-grade"
 
 
 def test_partial_refresh_keeps_existing_components(tmp_path):

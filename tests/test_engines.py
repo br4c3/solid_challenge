@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from rf_design.engine.compatibility import check_bfic_pa, check_frequency
+from rf_design.engine.compatibility import check_bfic_pa, check_frequency, esa_band
 from rf_design.engine.link_budget import calculate_gt, combine_snr_db, free_space_path_loss_db, slant_range_km
 from rf_design.engine.noise_figure import calculate_receiver_nf
 from rf_design.engine.power_chain import calculate_tx_chain
@@ -28,6 +28,15 @@ def test_frequency_checks_the_whole_channel():
     req = LinkRequirement("Terminal", "Uplink", 30.0, 100.0, 40.0, 888.0, 30.0)
     item = Component(None, "BFIC", "Test", "BF-1", "Terminal", "Tx", freq_min_ghz=29.96, freq_max_ghz=30.04)
     assert check_frequency(item, req).status == Status.FAIL
+
+
+def test_esa_bands_reverse_between_terminal_and_payload():
+    assert esa_band("Terminal", "Uplink") == (27.5,31.0)
+    assert esa_band("Terminal", "Downlink") == (17.7,21.2)
+    assert esa_band("Payload", "Uplink") == (27.5,31.0)
+    assert esa_band("Payload", "Downlink") == (17.7,21.2)
+    assert esa_band("Terminal", "Tx") == (27.5,31.0)
+    assert esa_band("Payload", "Tx") == (17.7,21.2)
 
 
 def test_converter_frequency_uses_if_instead_of_rf():
