@@ -67,6 +67,15 @@ RANGE_MAP = {
     "Operating Temperature": ("operating_temp_min_c", "operating_temp_max_c"),
 }
 
+REFERENCE_PRODUCT_URLS = {
+    "Stampede2731 (HP)": "https://www.sivers-semiconductors.com/wireless/stampede2731-2/",
+    "Stampede2731 (MP/LP)": "https://www.sivers-semiconductors.com/wireless/stampede2731lp-2/",
+}
+
+REFERENCE_PRODUCT_IMAGES = {
+    "Stampede2731 (HP)": "https://www.sivers-semiconductors.com/wp-content/uploads/2025/11/Stampede2731-1.png",
+}
+
 
 def _rows_by_parameter(ws) -> Dict[str, int]:
     return {str(ws.cell(row, 2).value).strip(): row for row in range(1, ws.max_row + 1) if ws.cell(row, 2).value}
@@ -147,6 +156,8 @@ def import_components(path: Path, repository: ComponentRepository) -> Tuple[int,
                 package=str(raw("Package") or raw("Package / Size") or "") or None,
                 operating_temp_min_c=common_values.get("operating_temp_min_c"),
                 operating_temp_max_c=common_values.get("operating_temp_max_c"),
+                product_url=REFERENCE_PRODUCT_URLS.get(str(part_no).strip()),
+                image_url=REFERENCE_PRODUCT_IMAGES.get(str(part_no).strip()),
                 source_file=Path(path).name,
                 note=f"Excel slot: {ws.cell(4, column).value}",
                 specs={key: value for key, value in specs.items() if value is not None},
@@ -181,7 +192,7 @@ COMMON_CSV_FIELDS = {
     "package","operating_temp_min_c","operating_temp_max_c","product_url",
     "datasheet_url","datasheet_revision","datasheet_page","data_origin","retrieved_at",
     "review_status","slot","note",
-    "source_file","source_date","extraction_method","extraction_evidence",
+    "source_file","source_date","extraction_method","extraction_evidence","image_url",
 }
 
 
@@ -225,6 +236,7 @@ def component_from_csv_row(row: dict, source_file: str = "csv") -> Component:
         extraction_method=row.get("extraction_method") or None,
         extraction_evidence=row.get("extraction_evidence") or None,
         note=row.get("note") or None,
+        image_url=row.get("image_url") or None,
         specs=specs,
     )
 

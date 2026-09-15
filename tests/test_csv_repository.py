@@ -15,6 +15,7 @@ def test_component_csv_round_trip_and_delete(tmp_path):
         function="Power Amplifier",
         freq_min_ghz=27.0,
         freq_max_ghz=31.0,
+        image_url="https://example.com/pa-30.png",
         specs={"gain_db": 24.5,"output_p1db_dbm": 31.0},
     )
 
@@ -26,6 +27,7 @@ def test_component_csv_round_trip_and_delete(tmp_path):
     assert repo.mcs_path.exists()
     assert loaded is not None
     assert loaded.part_no == "PA-30"
+    assert loaded.image_url == "https://example.com/pa-30.png"
     assert loaded.specs == {"gain_db": 24.5,"output_p1db_dbm": 31.0}
     with repo.component_path.open(encoding="utf-8-sig", newline="") as handle:
         row = next(csv.DictReader(handle))

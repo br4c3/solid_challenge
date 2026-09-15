@@ -283,6 +283,28 @@ def find_datasheet_url(manufacturer: str, page_url: str, html: bytes) -> str:
     return max(candidates, default=(0,""))[1]
 
 
+def find_product_image_url(page_url: str, html: bytes) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+    for selector,attribute in (
+        ('meta[property="og:image"]', "content"),
+        ('meta[name="twitter:image"]', "content"),
+        ('meta[property="twitter:image"]', "content"),
+        ('img[itemprop="image"]', "src"),
+    ):
+        element = soup.select_one(selector)
+        value   = element.get(attribute, "").strip() if element else ""
+        if value: return urljoin(page_url, value)
+
+    images = []
+    for element in soup.select("main img[src], article img[src], .product img[src]"):
+        value   = element.get("src", "").strip()
+        classes = " ".join(element.get("class", []))
+        label   = f"{element.get('alt', '')} {classes}".lower()
+        if not value or any(word in label for word in ("logo","icon","loading")): continue
+        images.append(urljoin(page_url, value))
+    return images[0] if images else ""
+
+
 def download_qorvo_pdf(product_url: str, pdf_path: Path) -> str:
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
     from playwright.sync_api import sync_playwright
@@ -342,15 +364,23 @@ def process_row(session: requests.Session, row: dict, offline: bool = False):
     product = None
 
     try:
+        if product_url and not offline and manufacturer != "Qorvo":
+            try:
+                product             = get(session, manufacturer, product_url)
+                component.image_url = find_product_image_url(product.url, product.content) or component.image_url
+            except Exception as exc:
+                print(f"상품 이미지 경고: {component.part_no}: {type(exc).__name__}: {exc}")
         if pdf_path.exists():
             datasheet_url = datasheet_url or component.datasheet_url or ""
         elif offline:
             raise RuntimeError("캐시된 Datasheet PDF가 없음")
         elif manufacturer == "Qorvo":
             datasheet_url = download_qorvo_pdf(product_url, pdf_path)
-        elif product_url and not datasheet_url:
+        elif product_url and not datasheet_url and product is None:
             product        = get(session, manufacturer, product_url)
             datasheet_url  = find_datasheet_url(manufacturer, product.url, product.content)
+        elif product is not None and not datasheet_url:
+            datasheet_url = find_datasheet_url(manufacturer, product.url, product.content)
         if not pdf_path.exists():
             if not datasheet_url and product is not None:
                 text             = BeautifulSoup(product.content, "html.parser").get_text(" ", strip=True)

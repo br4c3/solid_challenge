@@ -6,9 +6,9 @@ from typing import Any, Dict, List, Optional
 
 
 class Status(str, Enum):
-    PASS = "PASS"
-    WARN = "WARN"
-    FAIL = "FAIL"
+    PASS    = "PASS"
+    WARN    = "WARN"
+    FAIL    = "FAIL"
     UNKNOWN = "UNKNOWN"
 
 
@@ -46,6 +46,7 @@ class Component:
     extraction_method    : Optional[str]  = None
     extraction_evidence  : Optional[str]  = None
     note                 : Optional[str]  = None
+    image_url            : Optional[str]  = None
     specs                : Dict[str, Any] = field(default_factory=dict)
 
     def value(self, *keys: str, default: Any = None) -> Any:
