@@ -72,11 +72,6 @@ REFERENCE_PRODUCT_URLS = {
     "Stampede2731 (MP/LP)": "https://www.sivers-semiconductors.com/wireless/stampede2731lp-2/",
 }
 
-REFERENCE_PRODUCT_IMAGES = {
-    "Stampede2731 (HP)": "https://www.sivers-semiconductors.com/wp-content/uploads/2025/11/Stampede2731-1.png",
-}
-
-
 def _rows_by_parameter(ws) -> Dict[str, int]:
     return {str(ws.cell(row, 2).value).strip(): row for row in range(1, ws.max_row + 1) if ws.cell(row, 2).value}
 
@@ -158,7 +153,6 @@ def import_components(path: Path, repository: ComponentRepository) -> Tuple[int,
                 operating_temp_min_c=common_values.get("operating_temp_min_c"),
                 operating_temp_max_c=common_values.get("operating_temp_max_c"),
                 product_url=REFERENCE_PRODUCT_URLS.get(str(part_no).strip()),
-                image_url=REFERENCE_PRODUCT_IMAGES.get(str(part_no).strip()),
                 grade=infer_grade(part_no, raw("Notes / Remarks"), raw("Comments")),
                 source_file=Path(path).name,
                 note=f"Excel slot: {ws.cell(4, column).value}",
@@ -238,7 +232,6 @@ def component_from_csv_row(row: dict, source_file: str = "csv") -> Component:
         extraction_method=row.get("extraction_method") or None,
         extraction_evidence=row.get("extraction_evidence") or None,
         note=row.get("note") or None,
-        image_url=row.get("image_url") or None,
         grade=row.get("grade") or infer_grade(row.get("part_no"), row.get("note"), row.get("function")),
         specs=specs,
     )

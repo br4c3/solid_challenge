@@ -17,7 +17,7 @@ COMPONENT_FIELDS = [
     "freq_min_ghz","freq_max_ghz","supply_voltage_v","power_consumption_w","package",
     "operating_temp_min_c","operating_temp_max_c","product_url","datasheet_url",
     "datasheet_revision","datasheet_page","source_file","source_date","extraction_method",
-    "extraction_evidence","note","image_url","grade",
+    "extraction_evidence","note","grade",
 ]
 
 SPEC_FIELDS = [

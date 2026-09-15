@@ -54,23 +54,15 @@ def show_purchase_list(candidate):
     st.caption("평가용 단일 RF chain 기준으로 각 1개입니다. 실제 배열의 BFIC·PA 수량은 안테나 소자 수를 정한 뒤 산정하고, 제조사 페이지에서 재고와 수명주기를 최종 확인하세요.")
     for index,item in enumerate(candidate.components, start=1):
         with st.container(border=True):
-            image_column,detail_column = st.columns([1,2])
-            with image_column:
-                if item.image_url:
-                    st.image(item.image_url, caption=f"{item.manufacturer} 제공 이미지", width="stretch")
-                else:
-                    st.markdown(f"### {item.category}")
-                    st.caption("공식 상품 이미지 없음")
-            with detail_column:
-                st.markdown(f"#### {index}. {item.part_no}")
-                st.write(f"**제조사:** {item.manufacturer}  \n**역할:** {item.category} · {item.function or '-'}  \n**등급:** {item.grade}  \n**평가용 수량:** 1개  \n**패키지:** {item.package or '확인 필요'}")
-                if item.freq_min_ghz is not None and item.freq_max_ghz is not None:
-                    st.write(f"**주파수:** {item.freq_min_ghz:g}~{item.freq_max_ghz:g} GHz")
-                links = st.columns(2)
-                if item.product_url: links[0].link_button("제품·구매 페이지", item.product_url, width="stretch")
-                else: links[0].caption("제품·구매 링크 확인 필요")
-                if item.datasheet_url: links[1].link_button("데이터시트", item.datasheet_url, width="stretch")
-                else: links[1].caption("데이터시트 링크 확인 필요")
+            st.markdown(f"#### {index}. {item.part_no}")
+            st.write(f"**제조사:** {item.manufacturer}  \n**역할:** {item.category} · {item.function or '-'}  \n**등급:** {item.grade}  \n**평가용 수량:** 1개  \n**패키지:** {item.package or '확인 필요'}")
+            if item.freq_min_ghz is not None and item.freq_max_ghz is not None:
+                st.write(f"**주파수:** {item.freq_min_ghz:g}~{item.freq_max_ghz:g} GHz")
+            links = st.columns(2)
+            if item.product_url: links[0].link_button("제품·구매 페이지", item.product_url, width="stretch")
+            else: links[0].caption("제품·구매 링크 확인 필요")
+            if item.datasheet_url: links[1].link_button("데이터시트", item.datasheet_url, width="stretch")
+            else: links[1].caption("데이터시트 링크 확인 필요")
 
 
 def page_components(repo: ComponentRepository):

@@ -46,7 +46,6 @@ class Component:
     extraction_method    : Optional[str]   = None
     extraction_evidence  : Optional[str]   = None
     note                 : Optional[str]   = None
-    image_url            : Optional[str]   = None
     grade                : str             = "Commercial-grade"
     specs                : Dict[str, Any]  = field(default_factory=dict)
 

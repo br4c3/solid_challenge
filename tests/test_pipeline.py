@@ -8,7 +8,6 @@ from scripts.pipeline import (
     apply_extracted_fields,
     discovered_row,
     find_datasheet_url,
-    find_product_image_url,
     import_reference_components,
     process_rows,
     read_rows,
@@ -26,12 +25,6 @@ def test_find_datasheet_url_uses_official_pdf():
 def test_find_datasheet_url_rejects_unrelated_pdf():
     html = b'<a href="/documents/iso-certificate.pdf">ISO Certificate</a>'
     assert find_datasheet_url("Qorvo", "https://www.qorvo.com/products/p/QPA0001", html) == ""
-
-
-def test_find_product_image_url_prefers_open_graph_image():
-    html   = b'<meta property="og:image" content="/media/products/example.png"><main><img src="fallback.png"></main>'
-    result = find_product_image_url("https://example.com/products/part", html)
-    assert result == "https://example.com/media/products/example.png"
 
 
 def test_extracted_fields_feed_component_csv_model():
