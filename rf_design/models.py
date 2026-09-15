@@ -27,27 +27,27 @@ class Component:
     category             : str
     manufacturer         : str
     part_no              : str
-    application          : str            = "Common"
-    function             : str            = ""
-    process              : Optional[str]  = None
+    application          : str             = "Common"
+    function             : str             = ""
+    process              : Optional[str]   = None
     freq_min_ghz         : Optional[float] = None
     freq_max_ghz         : Optional[float] = None
     supply_voltage_v     : Optional[float] = None
     power_consumption_w  : Optional[float] = None
-    package              : Optional[str]  = None
+    package              : Optional[str]   = None
     operating_temp_min_c : Optional[float] = None
     operating_temp_max_c : Optional[float] = None
-    product_url          : Optional[str]  = None
-    datasheet_url        : Optional[str]  = None
-    datasheet_revision   : Optional[str]  = None
-    datasheet_page       : Optional[str]  = None
-    source_file          : Optional[str]  = None
-    source_date          : Optional[str]  = None
-    extraction_method    : Optional[str]  = None
-    extraction_evidence  : Optional[str]  = None
-    note                 : Optional[str]  = None
-    image_url            : Optional[str]  = None
-    specs                : Dict[str, Any] = field(default_factory=dict)
+    product_url          : Optional[str]   = None
+    datasheet_url        : Optional[str]   = None
+    datasheet_revision   : Optional[str]   = None
+    datasheet_page       : Optional[str]   = None
+    source_file          : Optional[str]   = None
+    source_date          : Optional[str]   = None
+    extraction_method    : Optional[str]   = None
+    extraction_evidence  : Optional[str]   = None
+    note                 : Optional[str]   = None
+    image_url            : Optional[str]   = None
+    specs                : Dict[str, Any]  = field(default_factory=dict)
 
     def value(self, *keys: str, default: Any = None) -> Any:
         for key in keys:
