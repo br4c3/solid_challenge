@@ -31,6 +31,9 @@ def _frequency_range(component: Component):
         return component.value("rf_min_ghz"),component.value("rf_max_ghz")
     if component.category.upper() == "PLL":
         return component.value("output_freq_min_ghz"),component.value("output_freq_max_ghz")
+    if component.category.upper() in {"ADC","DAC","CONVERTER"}:
+        bandwidth = component.value("analog_bandwidth_ghz")
+        return component.freq_min_ghz or 0.0,component.freq_max_ghz or bandwidth
     return component.freq_min_ghz,component.freq_max_ghz
 
 
@@ -58,15 +61,23 @@ def check_function(component: Component, requirement: LinkRequirement) -> CheckR
 
 
 def check_frequency(component: Component, requirement: LinkRequirement) -> CheckResult:
-    low, high = _frequency_range(component)
-    details = {"required_low_ghz": requirement.required_low_ghz, "required_high_ghz": requirement.required_high_ghz, "supported_low_ghz": low, "supported_high_ghz": high}
+    low,high = _frequency_range(component)
+    if component.category.upper() in {"ADC","DAC","CONVERTER"} and requirement.if_freq_ghz is not None:
+        required_low  = requirement.if_freq_ghz-requirement.channel_bw_mhz / 2000.0
+        required_high = requirement.if_freq_ghz+requirement.channel_bw_mhz / 2000.0
+        label         = "IF"
+    else:
+        required_low  = requirement.required_low_ghz
+        required_high = requirement.required_high_ghz
+        label         = "RF"
+    details = {"required_low_ghz": required_low, "required_high_ghz": required_high, "supported_low_ghz": low, "supported_high_ghz": high}
     if low is None or high is None:
         return CheckResult("frequency", Status.UNKNOWN, "주파수 범위 정보 없음", details)
-    if low <= requirement.required_low_ghz and high >= requirement.required_high_ghz:
-        edge_margin = min(requirement.required_low_ghz-low, high-requirement.required_high_ghz)
+    if low <= required_low and high >= required_high:
+        edge_margin = min(required_low-low, high-required_high)
         status = Status.WARN if edge_margin < requirement.channel_bw_mhz / 1000.0 else Status.PASS
-        return CheckResult("frequency", status, f"필요 {requirement.required_low_ghz:.4f}~{requirement.required_high_ghz:.4f} GHz가 지원 범위에 포함", {**details, "edge_margin_ghz": edge_margin})
-    return CheckResult("frequency", Status.FAIL, f"필요 {requirement.required_low_ghz:.4f}~{requirement.required_high_ghz:.4f} GHz, 지원 {low:g}~{high:g} GHz", details)
+        return CheckResult("frequency", status, f"필요 {label} {required_low:.4f}~{required_high:.4f} GHz가 지원 범위에 포함", {**details, "edge_margin_ghz": edge_margin})
+    return CheckResult("frequency", Status.FAIL, f"필요 {label} {required_low:.4f}~{required_high:.4f} GHz, 지원 {low:g}~{high:g} GHz", details)
 
 
 def check_bandwidth(component: Component, requirement: LinkRequirement) -> CheckResult:
@@ -103,17 +114,20 @@ def check_component(component: Component, requirement: LinkRequirement) -> List[
 
 def check_bfic_pa(bfic: Component, pa: Component, backoff_db: float = 3.0) -> CheckResult:
     bfic_limit = bfic.value("output_p1db_dbm")
-    pa_gain = pa.value("pa_gain_db", "gain_db")
-    pa_op1 = pa.value("output_p1db_dbm", "pa_p1db_dbm")
-    pa_ip1 = pa.value("input_p1db_dbm", "pa_input_p1db_dbm")
-    estimated = False
+    pa_gain    = pa.value("pa_gain_db", "gain_db")
+    pa_op1     = pa.value("output_p1db_dbm", "pa_p1db_dbm")
+    pa_ip1     = pa.value("input_p1db_dbm", "pa_input_p1db_dbm")
+    estimated  = False
+    if pa_op1 is None and pa.value("psat_dbm") is not None:
+        pa_op1    = pa.value("psat_dbm")
+        estimated = True
     if pa_ip1 is None and pa_gain is not None and pa_op1 is not None:
         pa_ip1 = pa_op1-pa_gain
         estimated = True
     if bfic_limit is None or pa_gain is None or pa_op1 is None or pa_ip1 is None:
         return CheckResult("bfic_pa_power", Status.UNKNOWN, "BFIC/PA P1dB 또는 gain 정보 부족")
     required_input = pa_op1-backoff_db-pa_gain
-    available      = bfic_limit-backoff_db
+    available      = bfic_limit
     margin         = available-required_input
     if margin < 0:
         status,message = Status.FAIL,f"BFIC 선형 출력이 PA 권장 입력보다 {-margin:.2f} dB 부족"

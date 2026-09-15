@@ -39,7 +39,14 @@ def parse_range(value: Any) -> Tuple[Optional[float], Optional[float]]:
 def parse_power_w(value: Any, unit: str) -> Optional[float]:
     number = first_number(value)
     if number is None: return None
-    return number / 1000.0 if unit.strip().lower() == "mw" else number
+
+    text  = str(value).replace(",", "")
+    match = re.search(r"[-+]?\d+(?:\.\d+)?\s*(m?w)\b", text, re.IGNORECASE)
+    if match and match.group(1).lower() == "w": return number
+    if match and match.group(1).lower() == "mw": return number / 1000.0
+    if "mw" in unit.strip().lower(): return number / 1000.0
+
+    return number
 
 
 def normalize_application(value: Any) -> str:

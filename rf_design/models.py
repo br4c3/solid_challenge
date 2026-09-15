@@ -130,18 +130,18 @@ class MCS:
 
 @dataclass
 class LinkBudgetResult:
-    slant_range_km            : float
-    fspl_db                   : float
+    slant_range_km             : float
+    fspl_db                    : float
     system_noise_temperature_k : float
-    gt_db_per_k               : float
-    eis_dbm                   : float
-    snr_noise_db              : float
-    snr_total_db              : float
-    mcs                       : Optional[MCS]
-    throughput_mbps           : float
-    throughput_margin_mbps    : float
-    result                    : Status
-    link_margin_db            : Optional[float]
+    gt_db_per_k                : float
+    eis_dbm                    : float
+    snr_noise_db               : float
+    snr_total_db               : float
+    mcs                        : Optional[MCS]
+    throughput_mbps            : float
+    throughput_margin_mbps     : float
+    result                     : Status
+    link_margin_db             : Optional[float]
 
 
 @dataclass

@@ -41,7 +41,8 @@ def component_rows(items):
             "ID": item.component_id, "Block": item.category, "Manufacturer": item.manufacturer,
             "Part No.": item.part_no, "Application": item.application, "Function": item.function,
             "Freq Min (GHz)": item.freq_min_ghz, "Freq Max (GHz)": item.freq_max_ghz,
-            "Power (W)": item.power_consumption_w, "Datasheet": item.datasheet_url,
+            "Power (W)": item.power_consumption_w, "Extraction": item.extraction_method,
+            "Datasheet": item.datasheet_url, "Note": item.note,
         }
         row.update(item.specs)
         rows.append(row)
@@ -273,12 +274,14 @@ def page_design(repo: ComponentRepository):
             st.warning("자동 chain을 만들 수 없습니다: "+" ".join(reasons))
         if candidates:
             best = candidates[0]
-            st.subheader("Recommended Chain")
+            st.subheader("Recommended Chain" if best.status == Status.PASS else "Best Available Chain")
+            if best.status != Status.PASS:
+                st.warning("현재 요구조건을 PASS하는 조합이 없어 가장 가까운 후보를 표시합니다. 아래 단계별 한계와 Link Margin을 확인하세요.")
             st.write(" → ".join(f"{item.category}: {item.part_no}" for item in best.components))
             st.metric("EIRP per beam", f"{best.eirp_dbw:.2f} dBW")
             show_link(best.link_budget)
             st.dataframe(pd.DataFrame([asdict(stage) for stage in best.power_chain.stages]), width="stretch", hide_index=True)
-            st.subheader("PASS 후보 순위")
+            st.subheader("후보 순위")
             ranking = pd.DataFrame([
                 {
                     "Rank": index+1,
@@ -301,6 +304,8 @@ def page_design(repo: ComponentRepository):
             st.write(" → ".join(f"{item.category}: {item.part_no}" for item in best["components"]))
             st.metric("Receiver Total NF", f"{best['total_nf_db']:.2f} dB")
             st.metric("Receiver Total Gain", f"{best['total_gain_db']:.2f} dB")
+            for check in best["checks"]:
+                st.write(f"{STATUS_ICON[check.status]} **{check.rule}** — {check.message}")
 
     st.subheader("독립 Link Budget 계산")
     antenna_input = st.number_input("Antenna input power (dBm)", value=34.0)
