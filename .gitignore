@@ -221,5 +221,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Streamlit
-.streamlit/secrets.toml
+# Vue / Vite
+frontend/node_modules/
+frontend/dist/

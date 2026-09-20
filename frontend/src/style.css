@@ -1,0 +1,67 @@
+:root {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #000;
+  background: #fff;
+}
+
+* { box-sizing: border-box; }
+body { margin: 8px; min-width: 320px; font-size: 14px; }
+button, input, select { border-radius: 0; font: inherit; }
+
+header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #000;
+}
+
+h1 { margin: 0; font-size: 24px; }
+h2 { margin: 0 0 12px; font-size: 18px; }
+p { margin-top: 0; }
+.eyebrow { margin-bottom: 2px; font-size: 11px; }
+nav { display: flex; gap: 4px; }
+nav button.active { font-weight: bold; }
+
+main { margin-top: 16px; }
+.panel { margin-bottom: 24px; }
+.section-title { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+
+.form-grid { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 10px 16px; }
+label { display: grid; gap: 3px; }
+input, select { width: 100%; }
+.submit { align-self: end; min-height: 24px; }
+
+.alert { padding: 8px; border: 1px solid #000; }
+.error { color: #900; }
+.warning { color: #640; }
+.count { font-size: 12px; }
+.chain { padding: 8px 0; border-bottom: 1px solid #999; font-weight: bold; }
+
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); margin: 12px 0; border: 1px solid #999; }
+.metrics article { padding: 8px; border-right: 1px solid #999; }
+.metrics article:last-child { border-right: 0; }
+.metrics span, .metrics strong { display: block; }
+.metrics span { font-size: 12px; }
+.metrics strong.PASS { color: #060; }
+.metrics strong.FAIL { color: #900; }
+.calculation-inputs { margin: 12px 0; }
+.calculation-inputs summary { margin-bottom: 6px; font-weight: bold; cursor: pointer; }
+.calculation-inputs table { width: auto; min-width: 420px; }
+.calculation-inputs th { width: 220px; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 4px 6px; border: 1px solid #999; text-align: left; }
+th { background: #ddd; }
+td:nth-child(2) { white-space: normal; }
+.selected td { background: #ffc; }
+.table-wrap tbody tr:hover td { background: #eee; }
+.candidate-link { padding: 0; border: 0; color: #00e; background: transparent; text-align: left; text-decoration: underline; cursor: pointer; }
+.category { width: 180px; }
+
+@media (max-width: 760px) {
+  header { align-items: start; flex-direction: column; gap: 8px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .metrics { grid-template-columns: repeat(2, 1fr); }
+}
