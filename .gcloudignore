@@ -1,0 +1,11 @@
+.gcloudignore
+.git
+.gitignore
+.venv
+.pytest_cache
+**/__pycache__
+**/*.pyc
+data/pdfs
+frontend/node_modules
+frontend/dist
+report.md
