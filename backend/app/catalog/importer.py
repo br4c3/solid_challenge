@@ -6,10 +6,9 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 from openpyxl import load_workbook
 
-from .csv_repository import ComponentRepository
-from .models import Component, MCS
 from .parsing import first_number, infer_grade, normalize_application, parse_power_w, parse_range
-
+from .repository import ComponentRepository
+from ..models import Component, MCS
 
 SHEET_CATEGORIES = {
     "Beamformer_BFIC": "BFIC",
@@ -72,6 +71,7 @@ REFERENCE_PRODUCT_URLS = {
     "Stampede2731 (MP/LP)": "https://www.sivers-semiconductors.com/wireless/stampede2731lp-2/",
 }
 
+
 def _rows_by_parameter(ws) -> Dict[str, int]:
     return {str(ws.cell(row, 2).value).strip(): row for row in range(1, ws.max_row + 1) if ws.cell(row, 2).value}
 
@@ -79,40 +79,41 @@ def _rows_by_parameter(ws) -> Dict[str, int]:
 def _actual_model_columns(ws) -> Iterable[int]:
     for column in range(5, ws.max_column + 1):
         header = ws.cell(4, column).value
-        if header and str(header).strip() and str(header).strip() != "예시 (Example)":
+        if header and str(header).strip() and str(header).strip() != "\uc608\uc2dc (Example)":
             yield column
 
 
 def import_components(path: Path, repository: ComponentRepository) -> Tuple[int, List[str]]:
-    workbook = load_workbook(path, data_only=True, read_only=True)
-    imported = 0
+    workbook            = load_workbook(path, data_only=True, read_only=True)
+    imported            = 0
     warnings: List[str] = []
     for sheet_name, category in SHEET_CATEGORIES.items():
         if sheet_name not in workbook.sheetnames:
-            warnings.append(f"시트 없음: {sheet_name}")
+            warnings.append(f"Missing worksheet: {sheet_name}")
             continue
-        ws = workbook[sheet_name]
+        ws   = workbook[sheet_name]
         rows = _rows_by_parameter(ws)
         for column in _actual_model_columns(ws):
+
             def raw(parameter: str) -> Any:
                 row = rows.get(parameter)
                 return ws.cell(row, column).value if row else None
 
-            part_no = raw("Part No.")
+            part_no      = raw("Part No.")
             manufacturer = raw("Manufacturer")
             if not part_no or not manufacturer:
                 continue
-            application = normalize_application(raw("Application (Terminal / Payload)"))
+            application                                                = normalize_application(raw("Application (Terminal / Payload)"))
             if str(part_no).strip().upper() == "ADAR3002": application = "Terminal"
-            function_label = next((key for key in rows if key.startswith("Function (")), "")
-            function = str(raw(function_label) or "")
-            freq_label = "Operating Frequency Range" if "Operating Frequency Range" in rows else "RF Frequency Range"
-            freq_min, freq_max = parse_range(raw(freq_label))
-            supply = first_number(raw("Supply Voltage"))
-            power_raw = raw("Power Consumption") or raw("Total DC Power")
-            power_unit = str(ws.cell(rows.get("Power Consumption", rows.get("Total DC Power", 1)), 3).value or "")
-            specs: Dict[str, Any] = {}
-            common_values: Dict[str, Any] = {}
+            function_label                                             = next((key for key in rows if key.startswith("Function (")), "")
+            function                                                   = str(raw(function_label) or "")
+            freq_label                                                 = "Operating Frequency Range" if "Operating Frequency Range" in rows else "RF Frequency Range"
+            freq_min, freq_max                                         = parse_range(raw(freq_label))
+            supply                                                     = first_number(raw("Supply Voltage"))
+            power_raw                                                  = raw("Power Consumption") or raw("Total DC Power")
+            power_unit                                                 = str(ws.cell(rows.get("Power Consumption", rows.get("Total DC Power", 1)), 3).value or "")
+            specs: Dict[str, Any]                                      = {}
+            common_values: Dict[str, Any]                              = {}
             for label, (low_key, high_key) in RANGE_MAP.items():
                 low, high = parse_range(raw(label))
                 if label == "Operating Frequency Range":
@@ -127,13 +128,13 @@ def import_components(path: Path, repository: ComponentRepository) -> Tuple[int,
                     continue
                 if key == "power_handling_dbm" and value is not None:
                     number = first_number(value)
-                    unit = str(ws.cell(rows[label], 3).value or "").lower()
+                    unit   = str(ws.cell(rows[label], 3).value or "").lower()
                     if number is not None and unit == "w":
                         import math
-                        number = 30.0+10.0 * math.log10(number)
+                        number = 30.0 + 10.0 * math.log10(number)
                     specs[key] = number
                 elif key == "lo_drive_dbm":
-                    low, high = parse_range(value)
+                    low, high                                            = parse_range(value)
                     specs["lo_drive_min_dbm"], specs["lo_drive_max_dbm"] = low, high
                 else:
                     specs[key] = first_number(value)
@@ -156,7 +157,10 @@ def import_components(path: Path, repository: ComponentRepository) -> Tuple[int,
                 grade=infer_grade(part_no, raw("Notes / Remarks"), raw("Comments")),
                 source_file=Path(path).name,
                 note=f"Excel slot: {ws.cell(4, column).value}",
-                specs={key: value for key, value in specs.items() if value is not None},
+                specs={
+                    key: value
+                    for key, value in specs.items() if value is not None
+                },
             )
             repository.upsert(component)
             imported += 1
@@ -166,47 +170,73 @@ def import_components(path: Path, repository: ComponentRepository) -> Tuple[int,
 def import_mcs(path: Path, repository: ComponentRepository) -> int:
     workbook = load_workbook(path, data_only=True, read_only=True)
     if "MCS" not in workbook.sheetnames:
-        raise ValueError("MCS 시트를 찾을 수 없습니다.")
-    ws = workbook["MCS"]
+        raise ValueError("MCS worksheet was not found.")
+    ws              = workbook["MCS"]
     rows: List[MCS] = []
     for row in range(4, ws.max_row + 1):
-        index = ws.cell(row, 2).value
-        order = ws.cell(row, 3).value
-        minimum = ws.cell(row, 4).value
-        maximum = ws.cell(row, 5).value
+        index      = ws.cell(row, 2).value
+        order      = ws.cell(row, 3).value
+        minimum    = ws.cell(row, 4).value
+        maximum    = ws.cell(row, 5).value
         efficiency = ws.cell(row, 7).value
-        rate = ws.cell(row, 8).value
+        rate       = ws.cell(row, 8).value
         if all(isinstance(x, (int, float)) for x in (index, order, minimum, maximum, efficiency)):
-            rows.append(MCS(int(index), int(order), float(minimum), float(maximum), float(efficiency), float(rate) / 1024.0 if rate else None))
+            rows.append(
+                MCS(
+                    int(index), int(order), float(minimum), float(maximum), float(efficiency),
+                    float(rate) / 1024.0 if rate else None
+                )
+            )
     repository.replace_mcs(rows)
     return len(rows)
 
 
 COMMON_CSV_FIELDS = {
-    "component_id","category","manufacturer","part_no","application","function","process",
-    "freq_min_ghz","freq_max_ghz","supply_voltage_v","power_consumption_w",
-    "package","operating_temp_min_c","operating_temp_max_c","product_url",
-    "datasheet_url","datasheet_revision","datasheet_page","data_origin","retrieved_at",
-    "review_status","slot","note",
-    "source_file","source_date","extraction_method","extraction_evidence","image_url","grade",
+    "component_id",
+    "category",
+    "manufacturer",
+    "part_no",
+    "application",
+    "function",
+    "process",
+    "freq_min_ghz",
+    "freq_max_ghz",
+    "supply_voltage_v",
+    "power_consumption_w",
+    "package",
+    "operating_temp_min_c",
+    "operating_temp_max_c",
+    "product_url",
+    "datasheet_url",
+    "datasheet_revision",
+    "datasheet_page",
+    "data_origin",
+    "retrieved_at",
+    "review_status",
+    "slot",
+    "note",
+    "source_file",
+    "source_date",
+    "extraction_method",
+    "extraction_evidence",
+    "image_url",
+    "grade",
 }
 
 
 def _csv_number(value: Any):
-    return first_number(value) if value not in (None,"") else None
+    return first_number(value) if value not in (None, "") else None
 
 
 def component_from_csv_row(row: dict, source_file: str = "csv") -> Component:
     category = row.get("category", "").upper()
     function = row.get("function", "")
     if category == "FEM":
-        lower = function.lower()
+        lower    = function.lower()
         category = "PA" if "pa" in lower else "LNA" if "lna" in lower else "SWITCH" if "switch" in lower or "sw" in lower else "FEM"
     specs = {
         key: _csv_number(value) if key not in {"digital_interface", "note"} else value
-        for key, value in row.items()
-        if key not in COMMON_CSV_FIELDS
-        and value not in (None, "")
+        for key, value in row.items() if key not in COMMON_CSV_FIELDS and value not in (None, "")
     }
     return Component(
         component_id=None,

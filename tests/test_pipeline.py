@@ -1,6 +1,6 @@
-from rf_design.datasheet_parser import ExtractedField
-from rf_design.csv_repository import ComponentRepository
-from rf_design.models import Component
+from backend.app.catalog.datasheet import ExtractedField
+from backend.app.catalog.repository import ComponentRepository
+from backend.app.models import Component
 from scripts.pipeline import (
     RESEARCHED_PRODUCT_ROWS,
     anokiwave_rows_from_html,
@@ -17,7 +17,7 @@ from scripts.pipeline import (
 
 
 def test_find_datasheet_url_uses_official_pdf():
-    html = b'<a href="/documents/1234/example-data-sheet.pdf">Data Sheet</a>'
+    html   = b'<a href="/documents/1234/example-data-sheet.pdf">Data Sheet</a>'
     result = find_datasheet_url("Qorvo", "https://www.qorvo.com/products/p/QPA0001", html)
     assert result == "https://www.qorvo.com/documents/1234/example-data-sheet.pdf"
 
@@ -29,7 +29,7 @@ def test_find_datasheet_url_rejects_unrelated_pdf():
 
 def test_extracted_fields_feed_component_csv_model():
     component = Component(None, "PA", "Example RF", "PA-30")
-    fields    = [
+    fields = [
         ExtractedField("freq_min_ghz", 27.0, "GHz", 1, "27 GHz to 31 GHz"),
         ExtractedField("freq_max_ghz", 31.0, "GHz", 1, "27 GHz to 31 GHz"),
         ExtractedField("output_p1db_dbm", 33.0, "dBm", 2, "Output P1dB 33 dBm"),
@@ -39,16 +39,16 @@ def test_extracted_fields_feed_component_csv_model():
 
     assert component.freq_min_ghz == 27.0
     assert component.freq_max_ghz == 31.0
-    assert component.specs["output_p1db_dbm"] == 33.0
+    assert component.specs.output_p1db_dbm == 33.0
 
 
 def test_analog_datasheet_url_is_resolved_without_product_page():
-    row = {"manufacturer": "Analog Devices","part_no": "HMC517-DIE","datasheet_url": ""}
+    row = {"manufacturer": "Analog Devices", "part_no": "HMC517-DIE", "datasheet_url": ""}
     assert resolve_datasheet_url(row).endswith("/hmc517chips.pdf")
 
 
 def test_downlink_mixer_datasheet_url_is_direct():
-    row = {"manufacturer": "Analog Devices","part_no": "HMC8191","datasheet_url": ""}
+    row = {"manufacturer": "Analog Devices", "part_no": "HMC8191", "datasheet_url": ""}
     assert resolve_datasheet_url(row).endswith("/hmc8191.pdf")
 
 
@@ -56,8 +56,8 @@ def test_researched_official_pool_covers_multiple_categories():
     categories = {row["category"] for row in RESEARCHED_PRODUCT_ROWS}
     parts      = {row["part_no"] for row in RESEARCHED_PRODUCT_ROWS}
 
-    assert categories == {"BFIC","PA","LNA","MIXER","PLL"}
-    assert {"ADAR3000S","ADAR3001","QPA2211","QPC4610","HMC519-DIE","HMC8192","ADF4371","LMX2595"} <= parts
+    assert categories == {"BFIC", "PA", "LNA", "MIXER", "PLL"}
+    assert {"ADAR3000S", "ADAR3001", "QPA2211", "QPC4610", "HMC519-DIE", "HMC8192", "ADF4371", "LMX2595"} <= parts
 
 
 def test_qorvo_catalog_card_discovers_ka_band_component():
@@ -92,11 +92,11 @@ def test_qorvo_catalog_card_rejects_external_sspa():
 def test_discovered_rows_are_appended_once(tmp_path):
     path = tmp_path / "seeds.csv"
     path.write_text("part_no,category,manufacturer\nBASE,PA,Qorvo\n", encoding="utf-8-sig")
-    discovered = [{"part_no": "NEW","category": "SWITCH","manufacturer": "Qorvo"}]
+    discovered = [{"part_no": "NEW", "category": "SWITCH", "manufacturer": "Qorvo"}]
 
     assert len(append_discovered_rows(path, discovered)) == 1
     assert append_discovered_rows(path, discovered) == []
-    assert [row["part_no"] for row in read_rows(path)] == ["BASE","NEW"]
+    assert [row["part_no"] for row in read_rows(path)] == ["BASE", "NEW"]
 
 
 def test_anokiwave_catalog_discovers_target_band_bfic():
@@ -117,7 +117,7 @@ def test_reference_bfics_are_added_to_final_component_csv(tmp_path):
     repo = ComponentRepository(tmp_path)
     save_components(repo, [Component(None, "PA", "Qorvo", "QPA2212T")], True)
 
-    count,warnings = import_reference_components(repo)
+    count, warnings = import_reference_components(repo)
 
     assert count == 10
     assert warnings == []
@@ -135,27 +135,29 @@ def test_partial_refresh_keeps_existing_components(tmp_path):
 
     save_components(repo, [Component(None, "PLL", "TI", "NEW")], False)
 
-    assert {component.part_no for component in repo.list()} == {"OLD","NEW"}
+    assert {component.part_no for component in repo.list()} == {"OLD", "NEW"}
 
 
 def test_failed_refresh_preserves_previous_extraction(tmp_path):
     repo     = ComponentRepository(tmp_path)
     previous = Component(None, "PA", "Qorvo", "QPA", extraction_method="PDF_TEXT", specs={"pa_gain_db": 22.0})
-    failed   = Component(None, "PA", "Qorvo", "QPA", note="추출 실패")
+    failed   = Component(None, "PA", "Qorvo", "QPA", note="Extraction failed")
     save_components(repo, [previous], True)
 
     save_components(repo, [failed], False)
 
     saved = repo.list()[0]
     assert saved.extraction_method == "PDF_TEXT"
-    assert saved.specs["pa_gain_db"] == 22.0
+    assert saved.specs.pa_gain_db == 22.0
 
 
 def test_parallel_processing_preserves_seed_order(monkeypatch):
     sessions = []
 
     class Session:
-        def close(self): pass
+
+        def close(self):
+            pass
 
     def make_test_session():
         session = Session()
@@ -170,14 +172,26 @@ def test_parallel_processing_preserves_seed_order(monkeypatch):
     monkeypatch.setattr("scripts.pipeline.make_session", make_test_session)
     monkeypatch.setattr("scripts.pipeline.process_row", process_test_row)
     rows = [
-        {"category": "PA","manufacturer": "A","part_no": "FIRST"},
-        {"category": "LNA","manufacturer": "B","part_no": "SECOND"},
-        {"category": "PLL","manufacturer": "C","part_no": "THIRD"},
+        {
+            "category": "PA",
+            "manufacturer": "A",
+            "part_no": "FIRST"
+        },
+        {
+            "category": "LNA",
+            "manufacturer": "B",
+            "part_no": "SECOND"
+        },
+        {
+            "category": "PLL",
+            "manufacturer": "C",
+            "part_no": "THIRD"
+        },
     ]
 
     components = process_rows(rows, offline=True, workers=3)
 
-    assert [component.part_no for component in components] == ["FIRST","SECOND","THIRD"]
+    assert [component.part_no for component in components] == ["FIRST", "SECOND", "THIRD"]
     assert len(sessions) == 3
 
 

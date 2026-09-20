@@ -14,4 +14,5 @@ def select_mcs(snr_db: float, table: Iterable[MCS]) -> Optional[MCS]:
 
 def calculate_throughput(mcs: Optional[MCS], bandwidth_mhz: float, overhead: float, fill_factor: float = 1.0) -> float:
     if mcs is None: return 0.0
-    return mcs.spectral_efficiency * bandwidth_mhz * (1.0-overhead) * fill_factor
+    # R[Mbps] = spectral efficiency[bit/s/Hz] * B[MHz] * usable fraction * fill factor.
+    return mcs.spectral_efficiency * bandwidth_mhz * (1.0 - overhead) * fill_factor

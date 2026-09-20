@@ -1,0 +1,15 @@
+{
+  "pipeline": {
+    "offline": false,
+    "limit": 0,
+    "part_no": "",
+    "workers": 4,
+    "discover": true
+  },
+  "server": {
+    "start_after_pipeline": false,
+    "host": "127.0.0.1",
+    "port": 5000,
+    "debug": false
+  }
+}

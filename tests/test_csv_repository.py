@@ -1,11 +1,11 @@
 import csv
 
-from rf_design.csv_repository import ComponentRepository
-from rf_design.models import Component
+from backend.app.catalog.repository import ComponentRepository
+from backend.app.models import Component
 
 
 def test_component_csv_round_trip_and_delete(tmp_path):
-    repo      = ComponentRepository(tmp_path / "store")
+    repo = ComponentRepository(tmp_path / "store")
     component = Component(
         component_id=None,
         category="PA",
@@ -16,7 +16,10 @@ def test_component_csv_round_trip_and_delete(tmp_path):
         freq_min_ghz=27.0,
         freq_max_ghz=31.0,
         grade="Space-grade",
-        specs={"gain_db": 24.5,"output_p1db_dbm": 31.0},
+        specs={
+            "gain_db": 24.5,
+            "output_p1db_dbm": 31.0
+        },
     )
 
     component_id = repo.upsert(component)
@@ -28,7 +31,8 @@ def test_component_csv_round_trip_and_delete(tmp_path):
     assert loaded is not None
     assert loaded.part_no == "PA-30"
     assert loaded.grade == "Space-grade"
-    assert loaded.specs == {"gain_db": 24.5,"output_p1db_dbm": 31.0}
+    assert loaded.specs.gain_db == 24.5
+    assert loaded.specs.output_p1db_dbm == 31.0
     with repo.component_path.open(encoding="utf-8-sig", newline="") as handle:
         row = next(csv.DictReader(handle))
     assert "specs_json" not in row
