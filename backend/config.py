@@ -10,7 +10,7 @@ DEFAULT_CONFIG_PATH = BACKEND_DIR / "config.json"
 ConfigType          = TypeVar("ConfigType", bound="ConfigSection")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ConfigSection:
 
     @classmethod
@@ -21,7 +21,7 @@ class ConfigSection:
         return cls(**values)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class PipelineConfig(ConfigSection):
     offline: bool  = False
     limit: int     = 0
@@ -39,7 +39,7 @@ class PipelineConfig(ConfigSection):
         if type(self.discover) is not bool: raise ValueError("pipeline.discover must be a boolean.")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ServerConfig(ConfigSection):
     start_after_pipeline: bool = False
     host: str                  = "127.0.0.1"
@@ -56,7 +56,7 @@ class ServerConfig(ConfigSection):
         if type(self.debug) is not bool: raise ValueError("server.debug must be a boolean.")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ProjectConfig:
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     server: ServerConfig     = field(default_factory=ServerConfig)

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
 
 const page = ref("design")
 const loading = ref(false)
@@ -9,6 +9,13 @@ const components = ref([])
 const category = ref("ALL")
 const bands = ref({})
 const selectedCandidateIndex = ref(0)
+const crawlState = ref("idle")
+const crawlLogs = ref([])
+const crawlOffset = ref(0)
+const crawlStartedAt = ref(null)
+const crawlFinishedAt = ref(null)
+const terminal = ref(null)
+let crawlTimer = null
 
 const requirement = ref({
   application: "Terminal",
@@ -79,8 +86,20 @@ async function api(path, options = {}) {
     headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
     ...options,
   })
-  const body = await response.json()
-  if (!response.ok) throw new Error(body.error ?? "The request could not be processed.")
+  const content = await response.text()
+  let body = null
+  if (content) {
+    try {
+      body = JSON.parse(content)
+    } catch {
+      throw new Error(`The API returned an invalid response (HTTP ${response.status}).`)
+    }
+  }
+  if (!response.ok) {
+    const unavailable = response.status >= 500 ? " Make sure the backend server is running." : ""
+    throw new Error(body?.error ?? `The API request failed (HTTP ${response.status}).${unavailable}`)
+  }
+  if (body == null) throw new Error(`The API returned an empty response for ${path}.`)
   return body
 }
 
@@ -93,6 +112,70 @@ async function loadInitialData() {
   } catch (reason) {
     error.value = reason.message
   }
+}
+
+async function loadComponents() {
+  const inventory = await api("/api/components")
+  components.value = inventory.components
+}
+
+async function updateCrawlStatus(reset = false) {
+  if (reset) {
+    crawlLogs.value = []
+    crawlOffset.value = 0
+  }
+  const previousState = crawlState.value
+  const status = await api(`/api/crawl?after=${crawlOffset.value}`)
+  crawlLogs.value.push(...status.logs)
+  crawlOffset.value = status.next_offset
+  crawlState.value = status.state
+  crawlStartedAt.value = status.started_at
+  crawlFinishedAt.value = status.finished_at
+  await nextTick()
+  if (terminal.value) terminal.value.scrollTop = terminal.value.scrollHeight
+  if (status.state === "running") {
+    startCrawlPolling()
+  } else {
+    stopCrawlPolling()
+    if (status.state === "succeeded" && previousState === "running") await loadComponents()
+  }
+}
+
+function startCrawlPolling() {
+  if (crawlTimer) return
+  crawlTimer = window.setInterval(() => {
+    updateCrawlStatus().catch((reason) => {
+      error.value = reason.message
+      stopCrawlPolling()
+    })
+  }, 500)
+}
+
+function stopCrawlPolling() {
+  if (!crawlTimer) return
+  window.clearInterval(crawlTimer)
+  crawlTimer = null
+}
+
+async function startCrawl() {
+  error.value = ""
+  try {
+    const status = await api("/api/crawl", { method: "POST" })
+    crawlLogs.value = status.logs
+    crawlOffset.value = status.next_offset
+    crawlState.value = status.state
+    crawlStartedAt.value = status.started_at
+    crawlFinishedAt.value = null
+    startCrawlPolling()
+    await nextTick()
+    if (terminal.value) terminal.value.scrollTop = terminal.value.scrollHeight
+  } catch (reason) {
+    error.value = reason.message
+  }
+}
+
+function crawlTime(value) {
+  return value ? new Date(value).toLocaleString() : "-"
 }
 
 function applyBand() {
@@ -130,18 +213,21 @@ function inputValue(value, unit) {
   return unit ? `${value} ${unit}` : value
 }
 
-onMounted(loadInitialData)
+onMounted(async () => {
+  await Promise.all([loadInitialData(), updateCrawlStatus(true)])
+})
+onBeforeUnmount(stopCrawlPolling)
 </script>
 
 <template>
   <header>
     <div>
-      <p class="eyebrow">SATELLITE RF SYSTEMS</p>
       <h1>Ka-band RF Designer</h1>
     </div>
     <nav>
       <button :class="{ active: page === 'design' }" @click="page = 'design'">Chain Design</button>
       <button :class="{ active: page === 'components' }" @click="page = 'components'">Components</button>
+      <button :class="{ active: page === 'crawl' }" @click="page = 'crawl'">Data Crawl</button>
     </nav>
   </header>
 
@@ -152,7 +238,6 @@ onMounted(loadInitialData)
       <section class="panel">
         <div class="section-title">
           <div>
-            <p class="eyebrow">REQUIREMENTS</p>
             <h2>Design Requirements</h2>
           </div>
           <button class="secondary" @click="applyBand">Apply ESA Band Center</button>
@@ -203,7 +288,6 @@ onMounted(loadInitialData)
       <section v-if="result" class="panel results">
         <div class="section-title">
           <div>
-            <p class="eyebrow">{{ result.function }} RESULT</p>
             <h2>{{ selectedCandidate ? `Candidate ${selectedCandidateIndex + 1}` : "No Candidate" }}</h2>
           </div>
           <span class="count">{{ result.evaluated_candidates }} evaluated</span>
@@ -257,9 +341,9 @@ onMounted(loadInitialData)
       </section>
     </template>
 
-    <section v-else class="panel">
+    <section v-else-if="page === 'components'" class="panel">
       <div class="section-title">
-        <div><p class="eyebrow">COMPONENT DATABASE</p><h2>Components</h2></div>
+        <div><h2>Components</h2></div>
         <select v-model="category" class="category"><option v-for="item in categories" :key="item">{{ item }}</option></select>
       </div>
       <div class="table-wrap">
@@ -273,6 +357,35 @@ onMounted(loadInitialData)
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <section v-else class="panel crawl-panel">
+      <div class="section-title">
+        <div>
+          <h2>Manufacturer Data Crawl</h2>
+        </div>
+        <div class="crawl-actions">
+          <span class="crawl-state" :class="crawlState">{{ crawlState }}</span>
+          <button class="primary" type="button" :disabled="crawlState === 'running'" @click="startCrawl">
+            {{ crawlState === "running" ? "Crawling…" : "Start Crawl" }}
+          </button>
+        </div>
+      </div>
+
+      <p class="crawl-description">
+        Discover official manufacturer products, download datasheets, extract specifications, and refresh the component database.
+      </p>
+      <div class="crawl-meta">
+        <span>Started: {{ crawlTime(crawlStartedAt) }}</span>
+        <span>Finished: {{ crawlTime(crawlFinishedAt) }}</span>
+        <span>Components: {{ components.length }}</span>
+      </div>
+
+      <div ref="terminal" class="terminal" role="log" aria-live="polite" aria-label="Crawler output">
+        <div class="terminal-bar"><span></span><span></span><span></span><strong>crawler — pipeline output</strong></div>
+        <pre v-if="crawlLogs.length">{{ crawlLogs.join("\n") }}</pre>
+        <pre v-else class="terminal-empty">Ready. Press Start Crawl to run the component pipeline.</pre>
       </div>
     </section>
   </main>

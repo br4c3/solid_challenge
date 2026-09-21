@@ -9,7 +9,7 @@ from pypdf import PdfReader
 from .extractor import extract_labeled_specs
 
 
-@dataclass(slots=True)
+@dataclass
 class ExtractedField:
     field: str
     value: float

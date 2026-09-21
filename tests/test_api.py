@@ -6,6 +6,28 @@ from backend.app.models import Component, MCS
 from backend.app import create_app
 
 
+class FakeCrawler:
+
+    def __init__(self):
+        self.running = False
+
+    def start(self):
+        if self.running: return False
+        self.running = True
+        return True
+
+    def snapshot(self, after=0):
+        logs = ["$ crawler", "[1/1] Test PART: PDF_TEXT"]
+        return {
+            "state": "running" if self.running else "idle",
+            "logs": logs[after:],
+            "next_offset": len(logs),
+            "started_at": "2026-09-21T00:00:00+00:00" if self.running else None,
+            "finished_at": None,
+            "exit_code": None,
+        }
+
+
 def component(category, part_no, function, **specs):
     return Component(
         None,
@@ -20,7 +42,7 @@ def component(category, part_no, function, **specs):
     )
 
 
-def api_client(tmp_path):
+def api_client(tmp_path, crawler=None):
     repository = ComponentRepository(tmp_path / "api-store")
     repository.replace_mcs([MCS(0, 2, -10.0, 100.0, 1.0)])
     repository.replace_components(
@@ -58,7 +80,7 @@ def api_client(tmp_path):
             component("PA", "PA", "PA", pa_gain_db=20.0, output_p1db_dbm=35.0),
         ]
     )
-    return create_app(repository).test_client()
+    return create_app(repository, crawler=crawler).test_client()
 
 
 def test_health_and_component_endpoints(tmp_path):
@@ -71,6 +93,28 @@ def test_health_and_component_endpoints(tmp_path):
     assert health.status_code == 200
     assert health.get_json() == {"status": "ok", "components": 4, "mcs": 1}
     assert len(components.get_json()["components"]) == 4
+
+
+def test_unknown_api_endpoint_returns_json_error(tmp_path):
+    response = api_client(tmp_path).get("/api/unknown")
+
+    assert response.status_code == 404
+    assert "error" in response.get_json()
+
+
+def test_crawl_endpoints_start_and_stream_incremental_logs(tmp_path):
+    crawler = FakeCrawler()
+    client  = api_client(tmp_path, crawler)
+
+    started   = client.post("/api/crawl")
+    duplicate = client.post("/api/crawl")
+    status    = client.get("/api/crawl?after=1")
+
+    assert started.status_code == 202
+    assert started.get_json()["state"] == "running"
+    assert duplicate.status_code == 409
+    assert status.get_json()["logs"] == ["[1/1] Test PART: PDF_TEXT"]
+    assert status.get_json()["next_offset"] == 2
 
 
 def test_design_endpoint_returns_serialized_tx_candidate(tmp_path):

@@ -19,7 +19,6 @@ header {
 h1 { margin: 0; font-size: 24px; }
 h2 { margin: 0 0 12px; font-size: 18px; }
 p { margin-top: 0; }
-.eyebrow { margin-bottom: 2px; font-size: 11px; }
 nav { display: flex; gap: 4px; }
 nav button.active { font-weight: bold; }
 
@@ -60,8 +59,29 @@ td:nth-child(2) { white-space: normal; }
 .candidate-link { padding: 0; border: 0; color: #00e; background: transparent; text-align: left; text-decoration: underline; cursor: pointer; }
 .category { width: 180px; }
 
+.crawl-panel { max-width: 1100px; }
+.crawl-actions { display: flex; align-items: center; gap: 8px; }
+.crawl-state { padding: 3px 7px; border: 1px solid #777; font-size: 11px; text-transform: uppercase; }
+.crawl-state.running { border-color: #986800; color: #805700; }
+.crawl-state.succeeded { border-color: #08752d; color: #08752d; }
+.crawl-state.failed { border-color: #a20f0f; color: #a20f0f; }
+.crawl-description { max-width: 760px; color: #444; }
+.crawl-meta { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0 8px; font-size: 12px; }
+.terminal { height: 430px; overflow: auto; border: 1px solid #222; background: #101413; color: #d9e5df; }
+.terminal-bar { position: sticky; top: 0; display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid #38413e; background: #202624; color: #aebbb5; font: 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.terminal-bar span { width: 9px; height: 9px; border-radius: 50%; background: #78817d; }
+.terminal-bar span:first-child { background: #df665b; }
+.terminal-bar span:nth-child(2) { background: #d8ac4b; }
+.terminal-bar span:nth-child(3) { background: #5daf68; }
+.terminal-bar strong { margin-left: 5px; font-weight: normal; }
+.terminal pre { margin: 0; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.terminal .terminal-empty { color: #89958f; }
+
 @media (max-width: 760px) {
   header { align-items: start; flex-direction: column; gap: 8px; }
   .form-grid { grid-template-columns: 1fr; }
   .metrics { grid-template-columns: repeat(2, 1fr); }
+  .section-title { align-items: stretch; flex-direction: column; }
+  .crawl-actions { justify-content: space-between; }
+  .terminal { height: 360px; }
 }

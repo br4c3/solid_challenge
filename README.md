@@ -23,7 +23,7 @@ data/              부품 및 MCS CSV
 - `backend/app/__init__.py`: Flask application factory
 - `backend/app/catalog/routes.py`: 상태 및 부품 조회 Blueprint
 - `backend/app/design/routes.py`: 호환성 검사, 체인 생성, 링크 버짓 Blueprint
-- `backend/app/models.py`: `dataclass(slots=True)` 기반 요구조건·부품 사양·계산 결과 구조체
+- `backend/app/models.py`: `dataclass` 기반 요구조건·부품 사양·계산 결과 구조체
 - `backend/app/design/`: RF 호환성, 출력, 잡음지수, 링크 버짓, 후보 생성
 - `backend/app/catalog/`: CSV 저장소, Excel import, PDF·OCR 사양 추출
 - `frontend/src/App.vue`: 요구조건 입력, 후보 결과, 부품 목록 화면
@@ -93,6 +93,8 @@ PDF 탐색·다운로드·텍스트/OCR 추출은 `pipeline.workers` 수만큼 �
 이미 받은 `data/pdfs/*.pdf`만 다시 분석하려면 `pipeline.offline`을 `true`로 설정합니다. 자료 수집 완료 후 Flask 서버도 실행하려면 `server.start_after_pipeline`을 `true`로 설정합니다.
 
 결과는 `data/components.csv`에서 바로 확인할 수 있습니다. `extraction_method`는 `PDF_TEXT`, `OCR`, `PDF_TEXT+OCR` 중 하나이며, `extraction_evidence`에는 페이지와 원문 근거가 저장됩니다.
+
+프론트엔드의 **Data Crawl** 탭에서도 파이프라인을 실행할 수 있습니다. **Start Crawl**을 누르면 제조사 탐색부터 CSV 갱신까지의 출력이 터미널 패널에 실시간으로 표시되며, 완료 후 부품 목록이 자동으로 갱신됩니다. 크롤링 작업은 한 번에 하나만 실행됩니다.
 
 Analog Devices와 Texas Instruments는 공식 PDF 주소로 바로 다운로드합니다. Qorvo가 일반 HTTP 요청을 429로 차단하면 설치된 Google Chrome을 자동 제어해 공식 제품 페이지의 Datasheet를 내려받습니다.
 

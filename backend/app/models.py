@@ -15,7 +15,7 @@ class Status(str, Enum):
 STATUS_PRIORITY = {Status.PASS: 0, Status.WARN: 1, Status.UNKNOWN: 2, Status.FAIL: 3}
 
 
-@dataclass(slots=True)
+@dataclass
 class CheckResult:
     rule: str
     status: Status
@@ -24,7 +24,7 @@ class CheckResult:
     estimated: bool         = False
 
 
-@dataclass(slots=True)
+@dataclass
 class ComponentSpec:
     number_channels: float | None       = None
     number_beams: float | None          = None
@@ -83,7 +83,7 @@ class ComponentSpec:
         return default if value is None else value
 
 
-@dataclass(slots=True)
+@dataclass
 class Component:
     component_id: int | None
     category: str
@@ -121,7 +121,7 @@ class Component:
         return default
 
 
-@dataclass(slots=True)
+@dataclass
 class LinkRequirement:
     application: str
     direction: str
@@ -171,7 +171,7 @@ class LinkRequirement:
         return self.center_freq_ghz + self.channel_bw_mhz / 2000.0
 
 
-@dataclass(slots=True)
+@dataclass
 class PowerStageResult:
     stage: str
     part_no: str
@@ -183,7 +183,7 @@ class PowerStageResult:
     message: str
 
 
-@dataclass(slots=True)
+@dataclass
 class PowerChainResult:
     stages: list[PowerStageResult]
     output_dbm: float
@@ -191,7 +191,7 @@ class PowerChainResult:
     checks: list[CheckResult] = field(default_factory=list)
 
 
-@dataclass(slots=True)
+@dataclass
 class MCS:
     index: int
     modulation_order: int
@@ -210,7 +210,7 @@ class MCS:
         }.get(self.modulation_order, f"Qm={self.modulation_order}")
 
 
-@dataclass(slots=True)
+@dataclass
 class LinkBudgetResult:
     slant_range_km: float
     fspl_db: float
@@ -243,7 +243,7 @@ class LinkBudgetResult:
     min_throughput_mbps: float
 
 
-@dataclass(slots=True)
+@dataclass
 class TxCandidate:
     components: list[Component]
     checks: list[CheckResult]
@@ -260,7 +260,7 @@ class TxCandidate:
         return max(statuses, key=STATUS_PRIORITY.get) if statuses else Status.UNKNOWN
 
 
-@dataclass(slots=True)
+@dataclass
 class RxCandidate:
     components: list[Component]
     checks: list[CheckResult]

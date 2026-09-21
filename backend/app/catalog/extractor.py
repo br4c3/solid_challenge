@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class SpecMatch:
     field: str
     value: float

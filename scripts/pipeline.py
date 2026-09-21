@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import argparse
 import json
 import os
 import re
@@ -694,9 +695,12 @@ def run(config: PipelineConfig) -> ComponentRepository:
 
 
 def main() -> int:
-    config = load_config()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--crawl-only", action="store_true", help="Run the pipeline without starting the web server.")
+    arguments = parser.parse_args()
+    config    = load_config()
     run(config.pipeline)
-    if not config.server.start_after_pipeline: return 0
+    if arguments.crawl_only or not config.server.start_after_pipeline: return 0
     from backend.app import create_app
     create_app().run(host=config.server.host, port=config.server.port, debug=config.server.debug)
     return 0
