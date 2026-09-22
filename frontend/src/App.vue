@@ -1,5 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
+import katex from "katex"
+import "katex/dist/katex.min.css"
 
 const page = ref("design")
 const loading = ref(false)
@@ -9,6 +11,7 @@ const components = ref([])
 const category = ref("ALL")
 const bands = ref({})
 const selectedCandidateIndex = ref(0)
+const selectedComponent = ref(null)
 const crawlState = ref("idle")
 const crawlLogs = ref([])
 const crawlOffset = ref(0)
@@ -48,6 +51,101 @@ const filteredComponents = computed(() =>
   category.value === "ALL" ? components.value : components.value.filter((item) => item.category === category.value),
 )
 const selectedCandidate = computed(() => result.value?.candidates?.[selectedCandidateIndex.value] ?? null)
+const requirementFunction = computed(() => {
+  const application = requirement.value.application.toLowerCase()
+  const direction   = requirement.value.direction.toLowerCase()
+  if (["tx", "transmit"].includes(direction)) return "Tx"
+  if (["rx", "receive"].includes(direction)) return "Rx"
+  if (["ul", "uplink"].includes(direction)) return application === "terminal" ? "Tx" : "Rx"
+  if (["dl", "downlink"].includes(direction)) return application === "terminal" ? "Rx" : "Tx"
+  return requirement.value.direction
+})
+const calculationEquations = computed(() => {
+  if (requirementFunction.value === "Rx") {
+    return [
+      {
+        title: "Cascaded Gain",
+        latex: String.raw`G_{\mathrm{total,dB}}=\sum_{k=1}^{n}G_{k,\mathrm{dB}}`,
+        description: "Adds the gain or loss of every selected receiver stage.",
+      },
+      {
+        title: "Friis Noise Factor",
+        latex: String.raw`F_{\mathrm{total}}=F_1+\sum_{k=2}^{n}\frac{F_k-1}{\prod_{i=1}^{k-1}G_i}`,
+        description: "Combines each stage noise factor using preceding linear gain.",
+      },
+      {
+        title: "Total Noise Figure",
+        latex: String.raw`NF_{\mathrm{total,dB}}=10\log_{10}\!\left(F_{\mathrm{total}}\right),\quad F_k=10^{NF_{k,\mathrm{dB}}/10}`,
+        description: "Converts component noise figures to linear factors, then returns the cascade result to dB.",
+      },
+    ]
+  }
+  return [
+    {
+      title: "Stage Output Power",
+      latex: String.raw`P_{\mathrm{out},k}[\mathrm{dBm}]=P_{\mathrm{in},k}[\mathrm{dBm}]+G_k[\mathrm{dB}]`,
+      description: "Propagates power through the selected Tx chain and checks each linear output limit.",
+    },
+    {
+      title: "Slant Range",
+      latex: String.raw`d=\sqrt{(R_E+h)^2-(R_E\cos e)^2}-R_E\sin e`,
+      description: "Computes maximum slant range from altitude h and elevation e using spherical-Earth geometry.",
+    },
+    {
+      title: "Free-space Path Loss",
+      latex: String.raw`L_{\mathrm{FSPL}}[\mathrm{dB}]=92.45+20\log_{10}(f_{\mathrm{GHz}})+20\log_{10}(d_{\mathrm{km}})`,
+      description: "Calculates propagation loss at boresight and maximum slant range.",
+    },
+    {
+      title: "Linear EIRP per Beam",
+      latex: String.raw`EIRP_{\mathrm{beam}}=P_{\mathrm{ant}}-30+G_{\mathrm{ant}}-L_{\mathrm{feed}}-10\log_{10}(N_{\mathrm{beams}})-OBO`,
+      description: "Applies antenna gain, feed loss, beam splitting, and output back-off to final-stage power.",
+    },
+    {
+      title: "Equivalent Input Noise",
+      latex: String.raw`EIS[\mathrm{dBm}]=-174+10\log_{10}(B_{\mathrm{Hz}})+NF-G_{\mathrm{rx}}`,
+      description: "Derives receiver input noise over the configured channel bandwidth.",
+    },
+    {
+      title: "Noise-limited SNR",
+      latex: String.raw`SNR_{\mathrm{noise}}=EIRP_{\mathrm{beam}}+30-L_{\mathrm{FSPL}}-L_{\mathrm{atm}}-L_{\mathrm{scint}}-L_{\mathrm{rain}}-EIS`,
+      description: "Subtracts path and environmental losses from available signal power.",
+    },
+    {
+      title: "Combined SNR",
+      latex: String.raw`SNR_{\mathrm{total}}=-10\log_{10}\!\left(10^{-SNR_{\mathrm{noise}}/10}+10^{-SNR_{\mathrm{nonlinear}}/10}\right)`,
+      description: "Combines thermal-noise and nonlinear impairment limits in the linear domain.",
+    },
+    {
+      title: "Throughput",
+      latex: String.raw`R[\mathrm{Mbps}]=\eta_{\mathrm{MCS}}\,B_{\mathrm{MHz}}\,(1-O_{\mathrm{control}})\,\eta_{\mathrm{resource}}`,
+      description: "Selects the highest valid MCS at the calculated SNR and applies overhead and resource factors.",
+    },
+  ]
+})
+const componentFields = computed(() => {
+  const item = selectedComponent.value
+  if (!item) return []
+  return [
+    ["Application", item.application],
+    ["Function", item.function],
+    ["Grade", item.grade],
+    ["Frequency", frequencyRange(item)],
+    ["Process", item.process],
+    ["Supply Voltage", unitValue(item.supply_voltage_v, "V")],
+    ["Power Consumption", unitValue(item.power_consumption_w, "W")],
+    ["Package", item.package],
+    ["Operating Temperature", temperatureRange(item)],
+    ["Datasheet Revision", item.datasheet_revision],
+    ["Datasheet Page", item.datasheet_page],
+    ["Extraction Method", item.extraction_method],
+    ["Evidence", item.extraction_evidence],
+    ["Note", item.note],
+  ].filter((entry) => entry[1] != null && entry[1] !== "")
+})
+const componentSpecs = computed(() => Object.entries(selectedComponent.value?.specs ?? {})
+  .filter((entry) => entry[1] != null && entry[1] !== "")
+  .map(([key, value]) => [fieldLabel(key), unitValue(value, specificationUnit(key))]))
 const calculationInputs = computed(() => {
   const input = result.value?.requirement
   if (!input) return []
@@ -188,6 +286,7 @@ async function calculate() {
   error.value = ""
   result.value = null
   selectedCandidateIndex.value = 0
+  selectedComponent.value = null
   try {
     result.value = await api("/api/designs", {
       method: "POST",
@@ -204,6 +303,42 @@ function chain(candidate) {
   return candidate.components.map((item) => `${item.category}: ${item.part_no}`).join(" → ")
 }
 
+function selectCandidate(index) {
+  selectedCandidateIndex.value = index
+  selectedComponent.value = null
+}
+
+function fieldLabel(key) {
+  const acronyms = { adc: "ADC", bfic: "BFIC", db: "dB", dbm: "dBm", dbc: "dBc", enob: "ENOB", evm: "EVM", ghz: "GHz", if: "IF", iip3: "IIP3", lna: "LNA", lo: "LO", mhz: "MHz", nf: "NF", oip3: "OIP3", p1db: "P1dB", pa: "PA", pae: "PAE", pll: "PLL", psat: "Psat", rf: "RF", rms: "RMS", sfdr: "SFDR", sinad: "SINAD", snr: "SNR" }
+  return key.split("_").map((word) => acronyms[word] ?? `${word[0].toUpperCase()}${word.slice(1)}`).join(" ")
+}
+
+function specificationUnit(key) {
+  if (key.endsWith("_ghz")) return "GHz"
+  if (key.endsWith("_gsps")) return "GSPS"
+  if (key.endsWith("_dbm")) return "dBm"
+  if (key.endsWith("_dbc")) return "dBc"
+  if (key.endsWith("_db")) return "dB"
+  if (key.endsWith("_deg")) return "deg"
+  if (key.endsWith("_percent")) return "%"
+  if (key.endsWith("_bit")) return "bit"
+  return ""
+}
+
+function unitValue(value, unit) {
+  return value == null ? null : `${value}${unit ? ` ${unit}` : ""}`
+}
+
+function frequencyRange(item) {
+  if (item.freq_min_ghz == null && item.freq_max_ghz == null) return null
+  return `${item.freq_min_ghz ?? "?"}–${item.freq_max_ghz ?? "?"} GHz`
+}
+
+function temperatureRange(item) {
+  if (item.operating_temp_min_c == null && item.operating_temp_max_c == null) return null
+  return `${item.operating_temp_min_c ?? "?"}–${item.operating_temp_max_c ?? "?"} °C`
+}
+
 function number(value, digits = 2) {
   return value == null ? "-" : Number(value).toFixed(digits)
 }
@@ -211,6 +346,10 @@ function number(value, digits = 2) {
 function inputValue(value, unit) {
   if (value == null) return "-"
   return unit ? `${value} ${unit}` : value
+}
+
+function renderLatex(expression) {
+  return katex.renderToString(expression, { displayMode: true, throwOnError: false })
 }
 
 onMounted(async () => {
@@ -283,6 +422,17 @@ onBeforeUnmount(stopCrawlPolling)
             {{ loading ? "Calculating…" : "Calculate RF Chain" }}
           </button>
         </form>
+
+        <details class="calculation-equations" open>
+          <summary>Calculation Equations ({{ requirementFunction }})</summary>
+          <div class="equation-grid">
+            <article v-for="equation in calculationEquations" :key="equation.title">
+              <h3>{{ equation.title }}</h3>
+              <div class="equation" v-html="renderLatex(equation.latex)"></div>
+              <p>{{ equation.description }}</p>
+            </article>
+          </div>
+        </details>
       </section>
 
       <section v-if="result" class="panel results">
@@ -296,7 +446,42 @@ onBeforeUnmount(stopCrawlPolling)
         <p v-for="warning in result.warnings" :key="warning" class="alert warning">{{ warning }}</p>
 
         <template v-if="selectedCandidate">
-          <p class="chain">{{ chain(selectedCandidate) }}</p>
+          <div class="chain" aria-label="Selected RF chain components">
+            <button
+              v-for="item in selectedCandidate.components"
+              :key="item.component_id ?? `${item.category}-${item.part_no}`"
+              class="chain-component"
+              :class="{ active: selectedComponent?.component_id === item.component_id && selectedComponent?.part_no === item.part_no }"
+              type="button"
+              @click="selectedComponent = item"
+            >
+              <span>{{ item.category }}</span>
+              <strong>{{ item.part_no }}</strong>
+              <small>{{ item.manufacturer }}</small>
+            </button>
+          </div>
+
+          <section v-if="selectedComponent" class="component-detail" aria-live="polite">
+            <div class="component-detail-title">
+              <div>
+                <span>{{ selectedComponent.category }}</span>
+                <h3>{{ selectedComponent.manufacturer }} {{ selectedComponent.part_no }}</h3>
+              </div>
+              <button type="button" aria-label="Close component details" @click="selectedComponent = null">×</button>
+            </div>
+            <div class="component-detail-grid">
+              <table v-if="componentFields.length">
+                <tbody><tr v-for="field in componentFields" :key="field[0]"><th>{{ field[0] }}</th><td>{{ field[1] }}</td></tr></tbody>
+              </table>
+              <table v-if="componentSpecs.length">
+                <tbody><tr v-for="spec in componentSpecs" :key="spec[0]"><th>{{ spec[0] }}</th><td>{{ spec[1] }}</td></tr></tbody>
+              </table>
+            </div>
+            <div class="component-links">
+              <a v-if="selectedComponent.product_url" :href="selectedComponent.product_url" target="_blank" rel="noreferrer">Product page</a>
+              <a v-if="selectedComponent.datasheet_url" :href="selectedComponent.datasheet_url" target="_blank" rel="noreferrer">Datasheet</a>
+            </div>
+          </section>
           <div v-if="result.function === 'Tx'" class="metrics">
             <article><span>Status</span><strong :class="selectedCandidate.status">{{ selectedCandidate.status }}</strong></article>
             <article><span>Linear EIRP / Beam</span><strong>{{ number(selectedCandidate.eirp_dbw) }} dBW</strong></article>
@@ -329,7 +514,7 @@ onBeforeUnmount(stopCrawlPolling)
               <tbody>
                 <tr v-for="(candidate, index) in result.candidates" :key="index" :class="{ selected: selectedCandidateIndex === index }">
                   <td>{{ index + 1 }}</td>
-                  <td><button class="candidate-link" type="button" @click="selectedCandidateIndex = index">{{ chain(candidate) }}</button></td>
+                  <td><button class="candidate-link" type="button" @click="selectCandidate(index)">{{ chain(candidate) }}</button></td>
                   <td v-if="result.function === 'Tx'">{{ candidate.status }}</td>
                   <td>{{ number(result.function === "Tx" ? candidate.link_budget?.link_margin_db : candidate.total_nf_db) }} dB</td>
                   <td>{{ number(candidate.total_power_w) }} W</td>

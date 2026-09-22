@@ -9,11 +9,31 @@ from scripts.pipeline import (
     discovered_row,
     find_datasheet_url,
     import_reference_components,
+    launch_chromium,
     process_rows,
     read_rows,
     resolve_datasheet_url,
     save_components,
 )
+
+
+def test_launch_chromium_uses_bundled_browser_when_channel_is_empty(monkeypatch):
+    calls = []
+
+    class Chromium:
+
+        def launch(self, **options):
+            calls.append(options)
+            return object()
+
+    class Playwright:
+        chromium = Chromium()
+
+    monkeypatch.setenv("PLAYWRIGHT_BROWSER_CHANNEL", "")
+
+    launch_chromium(Playwright())
+
+    assert calls == [{"headless": True}]
 
 
 def test_find_datasheet_url_uses_official_pdf():

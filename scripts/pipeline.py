@@ -330,6 +330,14 @@ RESEARCHED_PRODUCT_ROWS = (
 )
 
 
+def launch_chromium(playwright):
+    """Launch Chrome locally or the bundled Chromium when no channel is configured."""
+    browser_channel                        = os.environ.get("PLAYWRIGHT_BROWSER_CHANNEL", "chrome").strip()
+    options                                = {"headless": True}
+    if browser_channel: options["channel"] = browser_channel
+    return playwright.chromium.launch(**options)
+
+
 def read_rows(path: Path) -> list[dict]:
     with path.open(encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
@@ -385,7 +393,7 @@ def discover_qorvo_products() -> list[dict]:
 
     discovered = {}
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(channel="chrome", headless=True)
+        browser = launch_chromium(playwright)
         page    = browser.new_page()
         for catalog_url in DISCOVERY_PAGES:
             try:
@@ -502,7 +510,7 @@ def download_qorvo_pdf(product_url: str, pdf_path: Path) -> str:
 
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(channel="chrome", headless=True)
+        browser = launch_chromium(playwright)
         page    = browser.new_page(accept_downloads=True)
         page.goto(product_url, wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(2000)

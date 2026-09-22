@@ -30,12 +30,33 @@ main { margin-top: 16px; }
 label { display: grid; gap: 3px; }
 input, select { width: 100%; }
 .submit { align-self: end; min-height: 24px; }
+.calculation-equations { margin-top: 16px; border-top: 1px solid #999; padding-top: 10px; }
+.calculation-equations summary { font-weight: bold; cursor: pointer; }
+.equation-grid { display: grid; grid-template-columns: repeat(2, minmax(320px, 1fr)); gap: 10px; margin-top: 10px; }
+.equation-grid article { min-width: 0; padding: 10px; border: 1px solid #aaa; }
+.equation-grid h3 { margin: 0; font-size: 14px; }
+.equation-grid p { margin: 6px 0 0; color: #444; font-size: 12px; }
+.equation { overflow-x: auto; overflow-y: hidden; }
+.equation .katex-display { margin: 10px 0; text-align: left; }
 
 .alert { padding: 8px; border: 1px solid #000; }
 .error { color: #900; }
 .warning { color: #640; }
 .count { font-size: 12px; }
-.chain { padding: 8px 0; border-bottom: 1px solid #999; font-weight: bold; }
+.chain { display: flex; align-items: stretch; gap: 22px; padding: 8px 0 12px; overflow-x: auto; border-bottom: 1px solid #999; }
+.chain-component { position: relative; display: grid; min-width: 128px; padding: 8px 12px; border: 1px solid #777; background: #fff; text-align: left; cursor: pointer; }
+.chain-component:not(:last-child)::after { content: "→"; position: absolute; top: 50%; right: -18px; width: 14px; transform: translateY(-50%); font-weight: bold; }
+.chain-component:hover, .chain-component.active { border-color: #000; background: #ffc; }
+.chain-component span, .chain-component small { color: #555; font-size: 11px; }
+.chain-component strong { margin: 2px 0; }
+.component-detail { margin: 12px 0; padding: 12px; border: 2px solid #555; }
+.component-detail-title { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.component-detail-title span { color: #555; font-size: 11px; }
+.component-detail-title h3 { margin: 2px 0 0; font-size: 16px; }
+.component-detail-title button { border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; }
+.component-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 12px; }
+.component-detail-grid th { width: 45%; }
+.component-links { display: flex; gap: 16px; margin-top: 10px; }
 
 .metrics { display: grid; grid-template-columns: repeat(4, 1fr); margin: 12px 0; border: 1px solid #999; }
 .metrics article { padding: 8px; border-right: 1px solid #999; }
@@ -80,7 +101,9 @@ td:nth-child(2) { white-space: normal; }
 @media (max-width: 760px) {
   header { align-items: start; flex-direction: column; gap: 8px; }
   .form-grid { grid-template-columns: 1fr; }
+  .equation-grid { grid-template-columns: 1fr; }
   .metrics { grid-template-columns: repeat(2, 1fr); }
+  .component-detail-grid { grid-template-columns: 1fr; }
   .section-title { align-items: stretch; flex-direction: column; }
   .crawl-actions { justify-content: space-between; }
   .terminal { height: 360px; }
