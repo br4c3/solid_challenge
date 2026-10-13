@@ -7,10 +7,8 @@ from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Iterable, List, Optional
 
+from ...runtime import ensure_runtime_data
 from ..models import Component, ComponentSpec, MCS
-
-PROJECT_ROOT  = Path(__file__).resolve().parents[3]
-DEFAULT_STORE = PROJECT_ROOT / "data"
 
 COMPONENT_FIELDS = [
     "component_id",
@@ -51,8 +49,8 @@ def _number(value, integer: bool = False):
 
 class ComponentRepository:
 
-    def __init__(self, path: Path = DEFAULT_STORE):
-        self.path = Path(path)
+    def __init__(self, path: Optional[Path] = None):
+        self.path = Path(path) if path is not None else ensure_runtime_data()
         self.path.mkdir(parents=True, exist_ok=True)
         if not self.component_path.exists(): self._write(self.component_path, [], COMPONENT_FIELDS + SPEC_FIELDS)
         if not self.mcs_path.exists(): self._write(self.mcs_path, [], MCS_FIELDS)

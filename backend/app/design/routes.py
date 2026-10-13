@@ -11,6 +11,8 @@ from .compatibility import check_component, esa_band, overall_status, required_f
 from .link_budget import calculate_link_budget, calculate_peak_eirp
 from ..catalog.repository import ComponentRepository
 from ..models import LinkRequirement
+from ..preferences import ComponentKey, PreferenceRepository
+from ..formulas import DEFAULT_PROFILE_ID, FormulaEngine, FormulaProfileRepository
 
 REQUIREMENT_FIELDS = {field.name for field in fields(LinkRequirement)}
 
@@ -28,9 +30,9 @@ def serialize(value: Any):
 
 
 def parse_requirement(payload: dict) -> LinkRequirement:
-    if not isinstance(payload, dict): raise ValueError("Requirements must be a JSON object.")
+    if not isinstance(payload, dict): raise ValueError("요구사항은 JSON 객체 형식이어야 합니다.")
     unknown = set(payload) - REQUIREMENT_FIELDS
-    if unknown: raise ValueError(f"Unsupported requirement fields: {', '.join(sorted(unknown))}")
+    if unknown: raise ValueError(f"지원하지 않는 요구사항 항목: {', '.join(sorted(unknown))}")
     values = asdict(default_requirement())
     values.update(payload)
     requirement = LinkRequirement(**values)
@@ -44,7 +46,53 @@ def serialize_tx_candidate(candidate) -> dict:
     return result
 
 
-def create_design_blueprint(repository: ComponentRepository) -> Blueprint:
+def parse_pinned_components(payload: Any, components: list, function: str) -> list[ComponentKey]:
+    if payload is None: return []
+    if not isinstance(payload, list): raise ValueError("pinned_components는 배열이어야 합니다.")
+    allowed = {
+        "Tx": {
+            "DAC": "CONVERTER",
+            "CONVERTER": "CONVERTER",
+            "MIXER": "MIXER",
+            "PLL": "PLL",
+            "BFIC": "BFIC",
+            "PA": "PA",
+            "FEM": "PA",
+            "SWITCH": "SWITCH"
+        },
+        "Rx": {
+            "ADC": "CONVERTER",
+            "CONVERTER": "CONVERTER",
+            "LNA": "LNA",
+            "FEM": "LNA",
+            "BFIC": "BFIC",
+            "MIXER": "MIXER",
+            "PLL": "PLL",
+            "SWITCH": "SWITCH"
+        },
+    }[function]
+    resolved = []
+    stages   = set()
+    for value in payload:
+        requested = ComponentKey.from_mapping(value)
+        match     = next((component for component in components if requested.matches(component)), None)
+        if match is None:
+            raise ValueError(f"고정 부품을 찾을 수 없습니다: {requested.manufacturer} {requested.part_no}.")
+        category = match.category.upper()
+        if category not in allowed:
+            raise ValueError(f"{function} 체인에는 {match.category} 부품을 고정할 수 없습니다.")
+        stage = allowed[category]
+        if stage in stages: raise ValueError(f"{stage} 단계에는 부품 하나만 고정할 수 있습니다.")
+        stages.add(stage)
+        resolved.append(ComponentKey.from_component(match))
+    return resolved
+
+
+def create_design_blueprint(
+    repository: ComponentRepository,
+    preference_repository: PreferenceRepository,
+    formula_repository: FormulaProfileRepository,
+) -> Blueprint:
     api = Blueprint("design", __name__)
 
     @api.get("/config")
@@ -74,20 +122,43 @@ def create_design_blueprint(repository: ComponentRepository) -> Blueprint:
     @api.post("/designs")
     def designs():
         payload = request.get_json() or {}
-        if not isinstance(payload, dict): raise ValueError("Request body must be a JSON object.")
+        if not isinstance(payload, dict): raise ValueError("요청 본문은 JSON 객체 형식이어야 합니다.")
         requirement = parse_requirement(payload.get("requirement", payload))
         limit       = min(max(int(payload.get("limit", 5000)), 1), 5000)
         function    = required_function(requirement)
+        if function not in ("Tx", "Rx"): raise ValueError(f"지원하지 않는 링크 방향: {requirement.direction}")
+        components        = repository.list()
+        pinned            = parse_pinned_components(payload.get("pinned_components"), components, function)
+        preferences       = preference_repository.load()
+        formula_selection = payload.get("formula_profile") or {"id": DEFAULT_PROFILE_ID}
+        if not isinstance(formula_selection, dict): raise ValueError("formula_profile은 객체 형식이어야 합니다.")
+        profile = formula_repository.get(
+            str(formula_selection.get("id", DEFAULT_PROFILE_ID)), formula_selection.get("revision")
+        )
+        formula_engine = FormulaEngine(profile)
         if function == "Tx":
             candidates, warnings = generate_tx_candidates(
-                requirement, repository.list(), repository.list_mcs(), limit=limit
+                requirement,
+                components,
+                repository.list_mcs(),
+                limit=limit,
+                preferences=preferences,
+                pinned_components=pinned,
+                formula_engine=formula_engine,
             )
             serialized = [serialize_tx_candidate(candidate) for candidate in candidates[:50]]
         elif function == "Rx":
-            candidates, warnings = generate_rx_candidates(requirement, repository.list(), limit=limit)
-            serialized           = serialize(candidates[:50])
+            candidates, warnings = generate_rx_candidates(
+                requirement,
+                components,
+                limit=limit,
+                preferences=preferences,
+                pinned_components=pinned,
+                formula_engine=formula_engine,
+            )
+            serialized = serialize(candidates[:50])
         else:
-            raise ValueError(f"Unsupported link direction: {requirement.direction}")
+            raise ValueError(f"지원하지 않는 링크 방향: {requirement.direction}")
         return jsonify(
             {
                 "function": function,
@@ -96,13 +167,17 @@ def create_design_blueprint(repository: ComponentRepository) -> Blueprint:
                 "returned_candidates": len(serialized),
                 "candidates": serialized,
                 "warnings": warnings,
+                "formula_profile": {
+                    key: profile[key]
+                    for key in ("id", "name", "revision")
+                },
             }
         )
 
     @api.post("/link-budget")
     def link_budget():
         payload = request.get_json() or {}
-        if not isinstance(payload, dict): raise ValueError("Request body must be a JSON object.")
+        if not isinstance(payload, dict): raise ValueError("요청 본문은 JSON 객체 형식이어야 합니다.")
         requirement       = parse_requirement(payload.get("requirement", {}))
         antenna_input_dbm = float(payload.get("antenna_input_dbm", 34.0))
         peak_eirp         = requirement.peak_eirp_dbw

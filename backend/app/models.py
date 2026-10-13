@@ -251,6 +251,9 @@ class TxCandidate:
     eirp_dbw: float | None               = None
     link_budget: LinkBudgetResult | None = None
     total_power_w: float | None          = None
+    preference_score: int                = 0
+    preference_matches: list[str]        = field(default_factory=list)
+    calculation_trace: list[dict]        = field(default_factory=list)
 
     @property
     def status(self) -> Status:
@@ -267,3 +270,6 @@ class RxCandidate:
     total_gain_db: float
     total_nf_db: float
     total_power_w: float | None
+    preference_score: int         = 0
+    preference_matches: list[str] = field(default_factory=list)
+    calculation_trace: list[dict] = field(default_factory=list)

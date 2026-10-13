@@ -24,13 +24,15 @@ from urllib3.util.retry import Retry
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path: sys.path.insert(0, str(ROOT))
 
-from backend.config import PipelineConfig, load_config
 from backend.app.catalog.datasheet import extract_fields_from_pages, extract_pdf_pages
 from backend.app.catalog.importer import component_from_csv_row, import_components, import_mcs
 from backend.app.catalog.repository import ComponentRepository
+from backend.config import PipelineConfig, load_config
+from backend.runtime import data_dir, ensure_runtime_data, reference_dir
 
-SEED_CSV            = ROOT / "data/catalog/manufacturer_product_seeds.csv"
-PDF_DIR             = ROOT / "data/pdfs"
+DATA_DIR            = data_dir()
+SEED_CSV            = DATA_DIR / "catalog/manufacturer_product_seeds.csv"
+PDF_DIR             = DATA_DIR / "pdfs"
 QORVO_DOWNLOAD_LOCK = threading.Lock()
 
 MANUFACTURER_DOMAINS = {
@@ -599,7 +601,7 @@ def process_row(session: requests.Session, row: dict, offline: bool = False):
         evidence                      = [asdict(field) for field in fields]
         component.datasheet_url       = datasheet_url or component.datasheet_url
         component.datasheet_page      = ",".join(sorted({str(field.page) for field in fields})) or None
-        component.source_file         = str(pdf_path.relative_to(ROOT))
+        component.source_file         = str(pdf_path.relative_to(DATA_DIR))
         component.source_date         = datetime.now(timezone.utc).isoformat()
         component.extraction_method   = method
         component.extraction_evidence = json.dumps(evidence, ensure_ascii=False)
@@ -659,12 +661,13 @@ def save_components(repository: ComponentRepository, components: list, replace: 
 
 
 def import_reference_components(repository: ComponentRepository) -> tuple[int, list[str]]:
-    component_book = next((ROOT / "references").glob("3-*.xlsx"), None)
+    component_book = next(reference_dir().glob("3-*.xlsx"), None)
     if not component_book: return 0, ["Reference component workbook was not found"]
     return import_components(component_book, repository)
 
 
 def run(config: PipelineConfig) -> ComponentRepository:
+    ensure_runtime_data()
     if config.discover and not config.offline and not config.limit and not config.part_no:
         session    = make_session()
         discovered = list(RESEARCHED_PRODUCT_ROWS) + discover_qorvo_products()
@@ -692,7 +695,7 @@ def run(config: PipelineConfig) -> ComponentRepository:
     reference_count, warnings = import_reference_components(repository)
     for warning in warnings:
         print(f"Reference component warning: {warning}")
-    link_book = next((ROOT / "references").glob("4-*.xlsx"), None)
+    link_book = next(reference_dir().glob("4-*.xlsx"), None)
     if link_book: import_mcs(link_book, repository)
     failed = [component.part_no for component in components if not component.extraction_method]
     print(
@@ -703,14 +706,8 @@ def run(config: PipelineConfig) -> ComponentRepository:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--crawl-only", action="store_true", help="Run the pipeline without starting the web server.")
-    arguments = parser.parse_args()
-    config    = load_config()
-    run(config.pipeline)
-    if arguments.crawl_only or not config.server.start_after_pipeline: return 0
-    from backend.app import create_app
-    create_app().run(host=config.server.host, port=config.server.port, debug=config.server.debug)
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    run(load_config().pipeline)
     return 0
 
 

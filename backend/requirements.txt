@@ -1,5 +1,4 @@
 Flask>=3.1,<4
-gunicorn>=23,<24
 openpyxl>=3.1,<4
 requests>=2.32,<3
 urllib3>=1.26,<2
@@ -11,3 +10,4 @@ pillow>=10,<12
 playwright>=1.50,<2
 pytest>=8,<9
 yapf>=0.43,<1
+pyinstaller>=6.16,<7

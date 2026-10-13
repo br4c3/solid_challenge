@@ -5,9 +5,7 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Mapping, TypeVar
 
-BACKEND_DIR         = Path(__file__).resolve().parent
-DEFAULT_CONFIG_PATH = BACKEND_DIR / "config.json"
-ConfigType          = TypeVar("ConfigType", bound="ConfigSection")
+ConfigType = TypeVar("ConfigType", bound="ConfigSection")
 
 
 @dataclass(frozen=True)
@@ -40,29 +38,14 @@ class PipelineConfig(ConfigSection):
 
 
 @dataclass(frozen=True)
-class ServerConfig(ConfigSection):
-    start_after_pipeline: bool = False
-    host: str                  = "127.0.0.1"
-    port: int                  = 5000
-    debug: bool                = False
-
-    def validate(self) -> None:
-        if type(self.start_after_pipeline) is not bool:
-            raise ValueError("server.start_after_pipeline must be a boolean.")
-        if not isinstance(self.host, str) or not self.host.strip():
-            raise ValueError("server.host must be a non-empty string.")
-        if type(self.port) is not int or not 1 <= self.port <= 65535:
-            raise ValueError("server.port must be an integer between 1 and 65535.")
-        if type(self.debug) is not bool: raise ValueError("server.debug must be a boolean.")
-
-
-@dataclass(frozen=True)
 class ProjectConfig:
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
-    server: ServerConfig     = field(default_factory=ServerConfig)
 
 
-def load_config(path: Path = DEFAULT_CONFIG_PATH) -> ProjectConfig:
+def load_config(path: Path | None = None) -> ProjectConfig:
+    if path is None:
+        from .runtime import config_path
+        path = config_path()
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -70,14 +53,10 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> ProjectConfig:
     except json.JSONDecodeError as exc:
         raise ValueError(f"Configuration file contains invalid JSON: {path}: {exc}") from exc
     if not isinstance(payload, dict): raise ValueError("Configuration root must be a JSON object.")
-    unknown = set(payload) - {"pipeline", "server"}
+    unknown = set(payload) - {"pipeline"}
     if unknown: raise ValueError(f"Unsupported configuration sections: {', '.join(sorted(unknown))}")
     pipeline_values = payload.get("pipeline", {})
-    server_values   = payload.get("server", {})
     if not isinstance(pipeline_values, dict): raise ValueError("pipeline must be a JSON object.")
-    if not isinstance(server_values, dict): raise ValueError("server must be a JSON object.")
     pipeline = PipelineConfig.from_mapping(pipeline_values)
-    server   = ServerConfig.from_mapping(server_values)
     pipeline.validate()
-    server.validate()
-    return ProjectConfig(pipeline, server)
+    return ProjectConfig(pipeline)

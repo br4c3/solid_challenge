@@ -4,10 +4,9 @@ import subprocess
 import sys
 import threading
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+from ...runtime import resource_root
 
 
 def timestamp() -> str:
@@ -17,13 +16,19 @@ def timestamp() -> str:
 class CrawlManager:
 
     def __init__(self, command: Optional[list[str]] = None):
-        self.command                     = command or [sys.executable, "-u", "scripts/pipeline.py", "--crawl-only"]
-        self._lock                       = threading.Lock()
-        self._state                      = "idle"
-        self._logs: list[str]            = []
-        self._started_at: Optional[str]  = None
-        self._finished_at: Optional[str] = None
-        self._exit_code: Optional[int]   = None
+        self.command                              = command or self._default_command()
+        self._lock                                = threading.Lock()
+        self._state                               = "idle"
+        self._logs: list[str]                     = []
+        self._started_at: Optional[str]           = None
+        self._finished_at: Optional[str]          = None
+        self._exit_code: Optional[int]            = None
+        self._process: Optional[subprocess.Popen] = None
+
+    @staticmethod
+    def _default_command() -> list[str]:
+        if getattr(sys, "frozen", False): return [sys.executable, "--crawl-only"]
+        return [sys.executable, "-u", str(resource_root() / "scripts/pipeline.py")]
 
     def start(self) -> bool:
         with self._lock:
@@ -48,6 +53,11 @@ class CrawlManager:
                 "exit_code": self._exit_code,
             }
 
+    def stop(self) -> None:
+        with self._lock:
+            process = self._process
+        if process is not None and process.poll() is None: process.terminate()
+
     def _append(self, line: str) -> None:
         with self._lock:
             self._logs.append(line.rstrip("\r\n"))
@@ -57,12 +67,14 @@ class CrawlManager:
         try:
             process = subprocess.Popen(
                 self.command,
-                cwd=PROJECT_ROOT,
+                cwd=resource_root(),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
             )
+            with self._lock:
+                self._process = process
             if process.stdout:
                 for line in process.stdout:
                     self._append(line)
@@ -70,6 +82,7 @@ class CrawlManager:
         except Exception as exc:
             self._append(f"Unable to start crawler: {type(exc).__name__}: {exc}")
         with self._lock:
+            self._process     = None
             self._exit_code   = exit_code
             self._state       = "succeeded" if exit_code == 0 else "failed"
             self._finished_at = timestamp()
