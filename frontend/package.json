@@ -12,7 +12,7 @@
     "test": "vitest run",
     "backend:build": "node scripts/build-backend.cjs",
     "desktop:dir": "npm run backend:build && npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
-    "desktop:pack": "npm run backend:build && npm run build && electron-builder",
+    "desktop:pack": "npm run backend:build && npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
     "preview": "vite preview"
   },
   "dependencies": {

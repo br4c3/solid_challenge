@@ -28,6 +28,7 @@ The packaged application stores writable data under Electron's per-user applicat
 - Candidate and RF-stage controls provide sequential inspection of each result.
 - **Formula Profiles** can clone the built-in model, edit formulas and ranking rules, validate changes, and save immutable revisions. Results retain the selected profile revision and expose a calculation trace with actual inputs.
 - Up to five candidates can be compared and exported as a UTF-8 CSV file through the Electron save dialog.
+- The in-app Help Center is available from the activity bar or with **F1** and includes searchable workflow guidance, an RF glossary, and troubleshooting tips.
 
 Formula expressions use a restricted mathematical language rather than Python execution. Each formula slot has fixed input and output units shown in the editor. Profiles can be imported and exported as JSON; the built-in profile remains read-only.
 

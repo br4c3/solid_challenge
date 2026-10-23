@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { api } from "./api"
 import FormulaProfiles from "./components/FormulaProfiles.vue"
+import HelpCenter from "./components/HelpCenter.vue"
 import { DESIGN_DRAFT_KEY, parseDesignDraft, serializeDesignDraft } from "./designDraft"
 
 const page = ref("design")
@@ -38,6 +39,7 @@ const selectedFormulaProfile = ref({ id: "default-v1", revision: 1 })
 const formulaTraceIndex = ref(0)
 const compatibilityResults = ref([])
 const compatibilityLoading = ref(false)
+const previousPage = ref("design")
 let crawlTimer = null
 let compatibilityRequest = 0
 
@@ -720,7 +722,35 @@ function inputValue(value, unit) {
   return unit ? `${value} ${unit}` : value
 }
 
+function openHelp() {
+  if (page.value !== "help") previousPage.value = page.value
+  page.value = "help"
+}
+
+function closeHelp() {
+  page.value = previousPage.value
+}
+
+function navigateFromHelp(destination) {
+  previousPage.value = destination
+  page.value = destination
+  if (destination === "components") openComponentWorkspace()
+}
+
+function handleGlobalKeydown(event) {
+  if (event.key === "F1") {
+    event.preventDefault()
+    openHelp()
+  } else if (event.key === "Escape" && page.value === "help") {
+    closeHelp()
+  } else if (event.key === "/" && page.value === "help") {
+    event.preventDefault()
+    document.querySelector(".help-search input")?.focus()
+  }
+}
+
 onMounted(async () => {
+  window.addEventListener("keydown", handleGlobalKeydown)
   await Promise.all([loadInitialData(), updateCrawlStatus(true)])
 })
 watch(requirementFunction, () => {
@@ -734,6 +764,7 @@ watch(wizardStep, (step) => {
   if (step === 5) loadCompatibility()
 })
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleGlobalKeydown)
   stopCrawlPolling()
   window.clearTimeout(draftTimer)
 })
@@ -759,6 +790,9 @@ onBeforeUnmount(() => {
     </button>
     <button :class="{ active: page === 'crawl' }" title="데이터 수집" aria-label="데이터 수집" @click="page = 'crawl'">
       <span class="activity-icon">↻</span><span class="activity-label">데이터 수집</span>
+    </button>
+    <button class="help-activity" :class="{ active: page === 'help' }" title="Help (F1)" aria-label="Help" @click="openHelp">
+      <span class="activity-icon help-icon">?</span><span class="activity-label">Help</span>
     </button>
   </nav>
 
@@ -1161,6 +1195,8 @@ onBeforeUnmount(() => {
     </template>
 
     <FormulaProfiles v-else-if="page === 'formulas'" @error="error = $event" @updated="syncSelectedFormulaProfile" />
+
+    <HelpCenter v-else-if="page === 'help'" @close="closeHelp" @navigate="navigateFromHelp" />
 
     <section v-else-if="page === 'components'" class="panel">
       <div class="section-title">
